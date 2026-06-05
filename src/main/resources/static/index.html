@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Mini E-Commerce</title>
+<link rel="stylesheet" href="/styles.css?v=4">
+    <!-- SockJS + STOMP cho WebSocket realtime -->
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+    <button class="brand" data-view="home">MiniShop <span id="wsIndicator" class="ws-dot" title="Đang kết nối..."></span></button>
+    <div class="search">
+        <input id="searchInput" placeholder="Tìm sản phẩm">
+        <select id="categoryFilter"></select>
+    </div>
+    <nav>
+        <button data-view="products">Sản phẩm</button>
+        <button data-view="cart">Giỏ hàng</button>
+        <button data-view="orders">Đơn hàng</button>
+        <button data-view="admin" class="admin-only hidden">Admin</button>
+        <button id="profileButton" class="user-only hidden" data-view="profile"></button>
+        <button id="logoutButton" class="user-only hidden">Thoát</button>
+        <button id="authButton">Đăng nhập</button>
+    </nav>
+</header>
+
+<main>
+    <section id="homeView" class="view">
+        <!-- HERO: Asymmetric split layout, left-heavy content -->
+        <div class="hero-v2">
+            <!-- Left: content -->
+            <div class="hero-content">
+                <span class="hero-eyebrow">
+                    <span class="eyebrow-dot"></span>
+                    Spring Boot · MySQL · Live
+                </span>
+                <h1 class="hero-headline">
+                    <span class="line-reveal" style="--d:0ms">Mua sắm nhanh,</span>
+                    <span class="line-reveal hero-accent" style="--d:120ms">quản lý đơn rõ.</span>
+                    <span class="line-reveal hero-sub-line" style="--d:240ms">Trải nghiệm gọn như cửa hàng thật.</span>
+                </h1>
+                <p class="hero-desc line-reveal" style="--d:380ms">
+                    Danh mục, giỏ hàng, coupon và quản trị đều chạy trên API Spring Boot kết nối MySQL.
+                </p>
+                <div class="hero-ctas line-reveal" style="--d:500ms">
+                    <button class="cta-primary" data-view="products">
+                        Xem sản phẩm
+                        <span class="cta-icon">→</span>
+                    </button>
+                    <button class="cta-ghost" data-view="orders">Theo dõi đơn hàng</button>
+                </div>
+                <!-- Trust strip -->
+                <div class="hero-trust line-reveal" style="--d:640ms">
+                    <span class="trust-item"><span class="trust-dot green"></span>Hàng trăm sản phẩm</span>
+                    <span class="trust-sep">·</span>
+                    <span class="trust-item"><span class="trust-dot blue"></span>Đặt hàng tức thì</span>
+                    <span class="trust-sep">·</span>
+                    <span class="trust-item"><span class="trust-dot amber"></span>Coupon giảm giá</span>
+                </div>
+            </div>
+
+            <!-- Right: asymmetric image collage -->
+            <div class="hero-visual">
+                <div class="hero-img-main img-reveal" style="--d:200ms">
+                    <img src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=900&q=80" alt="Shopping">
+                </div>
+                <div class="hero-img-float img-reveal" style="--d:400ms">
+                    <img src="https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&q=80" alt="Product">
+                </div>
+                <div class="hero-badge-float badge-reveal" style="--d:600ms">
+                    <span class="badge-num">2k+</span>
+                    <span class="badge-label">Đơn hàng</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Featured products section -->
+        <div class="featured-section">
+            <div class="featured-head">
+                <div class="featured-head-left">
+                    <h2 class="featured-title scroll-reveal">Sản phẩm nổi bật</h2>
+                    <p class="featured-sub scroll-reveal" style="--sd:80ms">Được chọn lọc cho bạn</p>
+                </div>
+                <button class="cta-ghost scroll-reveal" style="--sd:160ms" data-view="products">Xem tất cả →</button>
+            </div>
+            <div id="featuredProducts" class="product-grid"></div>
+        </div>
+    </section>
+
+    <section id="productsView" class="view hidden">
+        <div class="section-head">
+            <div>
+                <p class="eyebrow">Catalog</p>
+                <h2>Danh sách sản phẩm</h2>
+            </div>
+            <button id="reloadProducts">Làm mới</button>
+        </div>
+        <div id="productsGrid" class="product-grid"></div>
+    </section>
+
+    <section id="detailView" class="view hidden">
+        <div id="productDetail"></div>
+    </section>
+
+    <section id="cartView" class="view hidden">
+        <div class="section-head">
+            <div>
+                <p class="eyebrow">Cart</p>
+                <h2>Giỏ hàng</h2>
+            </div>
+        </div>
+        <div class="split">
+            <div id="cartItems" class="panel"></div>
+            <form id="checkoutForm" class="panel form">
+                <h3>Thanh toán</h3>
+                <input name="couponCode" placeholder="Mã giảm giá, ví dụ WELCOME10">
+                <input name="shippingName" placeholder="Người nhận" required>
+                <input name="shippingPhone" placeholder="Số điện thoại" required>
+                <input name="shippingAddress" placeholder="Địa chỉ giao hàng" required>
+                <textarea name="note" placeholder="Ghi chú"></textarea>
+                <button class="primary">Đặt hàng</button>
+            </form>
+        </div>
+    </section>
+
+    <section id="ordersView" class="view hidden">
+        <div class="section-head">
+            <div>
+                <p class="eyebrow">Orders</p>
+                <h2>Đơn hàng của tôi</h2>
+            </div>
+        </div>
+        <div id="ordersList" class="orders-list-grid"></div>
+        <div id="orderDetail" class="order-detail-panel hidden"></div>
+    </section>
+
+    <section id="profileView" class="view hidden">
+        <div class="section-head">
+            <div>
+                <p class="eyebrow">Account</p>
+                <h2>Hồ sơ cá nhân</h2>
+            </div>
+        </div>
+        <div class="profile-layout">
+            <div class="panel profile-card">
+                <div class="avatar-upload-wrap" onclick="document.getElementById('avatarFileInput').click()" title="Nhấn để thay ảnh">
+                    <img id="profileAvatarPreview" class="avatar-lg" alt="Ảnh đại diện">
+                    <div class="avatar-edit-badge">📷</div>
+                </div>
+                <input type="file" id="avatarFileInput" accept="image/*" class="hidden">
+                <h3 id="profileNamePreview"></h3>
+                <p id="profileEmailPreview" class="muted"></p>
+                <span id="profileRoleBadge" class="profile-role-badge"></span>
+                <div class="profile-info-list" id="profileInfoList"></div>
+            </div>
+            <form id="profileForm" class="panel form">
+                <h3>Cập nhật thông tin</h3>
+                <input name="fullName" placeholder="Họ tên" required>
+                <input name="email" type="email" placeholder="Email" required>
+                <input name="phone" placeholder="Số điện thoại">
+                <input name="address" placeholder="Địa chỉ">
+                <div class="url-or-file">
+                    <input name="avatarUrl" id="avatarUrlInput" placeholder="URL ảnh đại diện (hoặc tải lên từ máy ở trái)">
+                </div>
+                <button class="primary">Lưu hồ sơ</button>
+            </form>
+        </div>
+    </section>
+
+    <section id="adminView" class="view hidden">
+        <div class="section-head">
+            <div>
+                <p class="eyebrow">Admin</p>
+                <h2>Dashboard quản trị</h2>
+            </div>
+        </div>
+        <div id="adminStats" class="stats"></div>
+        <div class="admin-tabs">
+            <button data-admin-tab="products" class="active">Sản phẩm</button>
+            <button data-admin-tab="categories">Danh mục</button>
+            <button data-admin-tab="coupons">Coupon</button>
+            <button data-admin-tab="orders">Đơn hàng</button>
+            <button data-admin-tab="stock">Tồn kho</button>
+        </div>
+        <div id="adminPanel" class="panel"></div>
+    </section>
+</main>
+
+<dialog id="authDialog">
+    <form id="authForm" class="form dialog-form">
+        <div class="section-head">
+            <h3 id="authTitle">Đăng nhập</h3>
+            <button type="button" id="closeAuth">Đóng</button>
+        </div>
+        <input name="usernameOrEmail" placeholder="Username hoặc email" required>
+        <input name="password" type="password" placeholder="Mật khẩu" required>
+        <input name="email" class="register-field hidden" type="email" placeholder="Email">
+        <input name="fullName" class="register-field hidden" placeholder="Họ tên">
+        <input name="phone" class="register-field hidden" placeholder="Số điện thoại">
+        <input name="address" class="register-field hidden" placeholder="Địa chỉ">
+        <button class="primary">Tiếp tục</button>
+        <button type="button" id="switchAuth">Tạo tài khoản mới</button>
+        <p class="hint">Admin: admin/admin123. Customer: customer/customer123.</p>
+    </form>
+</dialog>
+
+<div id="toast"></div>
+<script src="/app.js?v=5"></script>
+</body>
+</html>
