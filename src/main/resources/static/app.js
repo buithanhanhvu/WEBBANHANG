@@ -436,6 +436,7 @@ async function loadProfile() {
     form.address.value = u.address || "";
     form.avatarUrl.value = valueOf(u, "avatarUrl") || "";
     syncAuthUi();
+    await loadRankCard();
 }
 
 async function loadAdmin() {
@@ -864,5 +865,194 @@ document.getElementById("avatarFileInput").addEventListener("change", async (e) 
         toast(err.message);
     }
 });
+
+// ============================================================
+// HỆ THỐNG DANH HIỆU - RANK SYSTEM
+// ============================================================
+
+const RANKS = [
+    {
+        id: "shopper",
+        name: "Shopper",
+        subtitle: "Người qua đường",
+        icon: "🛍️",
+        desc: "Mới chân ướt chân ráo — mọi hành trình đều bắt đầu từ đây.",
+        minSpent: 0,
+        maxSpent: 500000,
+        color: "#334155",
+        cssClass: "rank-shopper"
+    },
+    {
+        id: "shark",
+        name: "Shark",
+        subtitle: "Cá mập tập sự",
+        icon: "🦈",
+        desc: "Đã bắt đầu chi tiêu mạnh tay — bản năng thị trường đang thức tỉnh.",
+        minSpent: 500000,
+        maxSpent: 2000000,
+        color: "#93c5fd",
+        cssClass: "rank-shark"
+    },
+    {
+        id: "angel",
+        name: "Angel Investor",
+        subtitle: "Nhà đầu tư thiên thần",
+        icon: "👼",
+        desc: "Chi tiêu hào phóng, tầm nhìn xa. Những deal tốt không bao giờ bỏ qua.",
+        minSpent: 2000000,
+        maxSpent: 5000000,
+        color: "#c4b5fd",
+        cssClass: "rank-angel"
+    },
+    {
+        id: "unicorn",
+        name: "Unicorn",
+        subtitle: "Kỳ lân công nghệ",
+        icon: "🦄",
+        desc: "Hiếm có khó tìm. Danh hiệu lấp lánh dành cho những tâm hồn mua sắm đặc biệt.",
+        minSpent: 5000000,
+        maxSpent: 15000000,
+        color: "#f0abfc",
+        cssClass: "rank-unicorn"
+    },
+    {
+        id: "tycoon",
+        name: "Tycoon",
+        subtitle: "Trùm tài phiệt",
+        icon: "💰",
+        desc: "Vàng chảy theo bước chân. Chỉ những tay chi tiêu đẳng cấp mới chạm tới đây.",
+        minSpent: 15000000,
+        maxSpent: 50000000,
+        color: "#fbbf24",
+        cssClass: "rank-tycoon"
+    },
+    {
+        id: "monopoly",
+        name: "Monopoly",
+        subtitle: "Kẻ thao túng thị trường",
+        icon: "👑",
+        desc: "Đỉnh cao hoàng gia. Thị trường này — là của bạn.",
+        minSpent: 50000000,
+        maxSpent: Infinity,
+        color: "#ef4444",
+        cssClass: "rank-monopoly"
+    }
+];
+
+function getRank(totalSpent) {
+    for (let i = RANKS.length - 1; i >= 0; i--) {
+        if (totalSpent >= RANKS[i].minSpent) return RANKS[i];
+    }
+    return RANKS[0];
+}
+
+function getRankProgress(totalSpent) {
+    const rank = getRank(totalSpent);
+    const idx = RANKS.indexOf(rank);
+    if (idx === RANKS.length - 1) return { rank, pct: 100, spent: totalSpent, nextName: null, needed: 0 };
+    const next = RANKS[idx + 1];
+    const range = next.minSpent - rank.minSpent;
+    const progress = totalSpent - rank.minSpent;
+    const pct = Math.min(100, Math.round((progress / range) * 100));
+    return { rank, pct, spent: totalSpent, nextName: next.name, needed: next.minSpent - totalSpent };
+}
+
+function renderGoldParticles() {
+    const count = 18;
+    let html = '<div class="rank-particles">';
+    for (let i = 0; i < count; i++) {
+        const left = Math.random() * 100;
+        const dur  = (2.5 + Math.random() * 2.5).toFixed(2);
+        const delay= (Math.random() * 3).toFixed(2);
+        const drift= (Math.random() * 40 - 20).toFixed(0);
+        const size = (3 + Math.random() * 4).toFixed(1);
+        html += `<span class="gold-particle" style="
+            left:${left}%;
+            top:-6px;
+            width:${size}px;
+            height:${size}px;
+            --dur:${dur}s;
+            --delay:${delay}s;
+            --sx:${(Math.random()*30-15).toFixed(0)}px;
+            --drift:${drift}px;
+        "></span>`;
+    }
+    html += '</div>';
+    return html;
+}
+
+function renderRankCard(totalSpent) {
+    const { rank, pct, nextName, needed } = getRankProgress(totalSpent);
+    const isTycoon   = rank.id === "tycoon";
+    const isMonopoly = rank.id === "monopoly";
+    const isMaxRank  = rank.id === "monopoly";
+
+    const xpLabel = isMaxRank
+        ? "Đã đạt cấp tối đa"
+        : `${pct}% → ${nextName}`;
+
+    const nextHint = isMaxRank
+        ? "Bạn đã chinh phục MiniShop."
+        : `Còn ${money(needed)} để lên <strong>${nextName}</strong>`;
+
+    const tierPips = RANKS.map((r, i) => {
+        const current  = r.id === rank.id;
+        const unlocked = totalSpent >= r.minSpent;
+        return `<span class="rank-tier-pip ${current ? "current" : ""} ${unlocked && !current ? "unlocked" : ""}">
+            ${r.icon} ${r.name}
+        </span>`;
+    }).join("");
+
+    return `
+    <div class="rank-card ${rank.cssClass}">
+        ${isTycoon || isMonopoly ? renderGoldParticles() : ""}
+        <div class="rank-badge-wrap">
+            <span class="rank-icon">${rank.icon}</span>
+            <span class="rank-title-label">${rank.id.toUpperCase()}</span>
+        </div>
+        <div class="rank-middle">
+            <h3 class="rank-name">${rank.name} <span style="font-size:14px;font-weight:600;opacity:.6">· ${rank.subtitle}</span></h3>
+            <p class="rank-desc">${rank.desc}</p>
+            <div class="rank-xp-row">
+                <span class="rank-xp-label">${xpLabel}</span>
+                <div class="rank-xp-bar-wrap">
+                    <div class="rank-xp-bar" id="rankXpBar" style="width:0%"></div>
+                </div>
+                <span class="rank-xp-pct">${pct}%</span>
+            </div>
+            <span class="rank-next-hint">${nextHint}</span>
+            <div class="rank-all-tiers">${tierPips}</div>
+        </div>
+        <div class="rank-spent-wrap">
+            <span class="rank-spent-value">${money(totalSpent)}</span>
+            <span class="rank-spent-label">Tổng chi tiêu</span>
+        </div>
+    </div>`;
+}
+
+// Hook vào loadProfile để load rank card cùng lúc
+async function loadRankCard() {
+    const rankCardEl = document.getElementById("rankCard");
+    if (!rankCardEl || !state.user) return;
+    try {
+        const orders = await api("/api/orders");
+        const totalSpent = orders
+            .filter(o => String(o.status) === "DELIVERED")
+            .reduce((sum, o) => sum + Number(valueOf(o, "total_amount", "totalAmount") || 0), 0);
+        rankCardEl.innerHTML = renderRankCard(totalSpent);
+        rankCardEl.classList.remove("hidden");
+        requestAnimationFrame(() => {
+            setTimeout(() => {
+                const bar = document.getElementById("rankXpBar");
+                if (bar) {
+                    const { pct } = getRankProgress(totalSpent);
+                    bar.style.width = pct + "%";
+                }
+            }, 120);
+        });
+    } catch (e) {
+        rankCardEl.classList.add("hidden");
+    }
+}
 
 loadBase().catch(error => toast(error.message));

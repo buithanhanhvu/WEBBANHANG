@@ -1506,3 +1506,427 @@ dialog {
         grid-column: 1 / -1;
     }
 }
+
+/* ============================================================
+   HỆ THỐNG DANH HIỆU - RANK SYSTEM
+   6 cấp: Shopper → Shark → Angel → Unicorn → Tycoon → Monopoly
+   ============================================================ */
+
+/* ── Rank Card wrapper ── */
+.rank-card {
+    border-radius: 20px;
+    padding: 32px 36px;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 24px;
+    align-items: center;
+    border: 1px solid transparent;
+    transition: box-shadow .3s ease;
+}
+
+/* ── Rank Badge (icon + tên) ── */
+.rank-badge-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    min-width: 90px;
+}
+
+.rank-icon {
+    font-size: 52px;
+    line-height: 1;
+    display: block;
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,.18));
+}
+
+.rank-title-label {
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    padding: 4px 12px;
+    border-radius: 999px;
+}
+
+/* ── Middle content ── */
+.rank-middle {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.rank-name {
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: -.01em;
+    margin: 0;
+    line-height: 1.1;
+}
+
+.rank-desc {
+    font-size: 13px;
+    opacity: .7;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.rank-xp-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.rank-xp-label {
+    font-size: 12px;
+    font-weight: 700;
+    opacity: .65;
+    white-space: nowrap;
+}
+
+.rank-xp-bar-wrap {
+    flex: 1;
+    min-width: 120px;
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(0,0,0,.15);
+    overflow: hidden;
+}
+
+.rank-xp-bar {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+    width: 0;
+}
+
+.rank-xp-pct {
+    font-size: 12px;
+    font-weight: 800;
+    opacity: .8;
+    white-space: nowrap;
+}
+
+/* ── Right: total spent ── */
+.rank-spent-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+.rank-spent-value {
+    font-size: 20px;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.rank-spent-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    opacity: .55;
+}
+
+/* ── Rank next hint ── */
+.rank-next-hint {
+    font-size: 11.5px;
+    opacity: .6;
+    margin-top: 2px;
+}
+
+/* ════════════════════════════════════════
+   TIER 1: SHOPPER — Xám nhẹ, khởi đầu
+   ════════════════════════════════════════ */
+.rank-shopper {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border-color: #cbd5e1;
+    color: #334155;
+    box-shadow: 0 4px 20px rgba(100,116,139,.12);
+}
+.rank-shopper .rank-title-label {
+    background: #e2e8f0;
+    color: #475569;
+}
+.rank-shopper .rank-xp-bar { background: #94a3b8; }
+
+/* ════════════════════════════════════════
+   TIER 2: SHARK — Xanh navy, sắc bén
+   ════════════════════════════════════════ */
+.rank-shark {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+    border-color: #1d4ed8;
+    color: #e0f2fe;
+    box-shadow: 0 8px 32px rgba(29,78,216,.25);
+}
+.rank-shark .rank-title-label {
+    background: rgba(59,130,246,.25);
+    color: #93c5fd;
+    border: 1px solid rgba(59,130,246,.3);
+}
+.rank-shark .rank-xp-bar-wrap { background: rgba(255,255,255,.1); }
+.rank-shark .rank-xp-bar { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+
+/* ════════════════════════════════════════
+   TIER 3: ANGEL INVESTOR — Tím pastel sang
+   ════════════════════════════════════════ */
+.rank-angel {
+    background: linear-gradient(135deg, #1e0938 0%, #4c1d95 60%, #7c3aed 100%);
+    border-color: #7c3aed;
+    color: #f3e8ff;
+    box-shadow: 0 8px 40px rgba(124,58,237,.3);
+}
+.rank-angel .rank-title-label {
+    background: rgba(196,181,253,.15);
+    color: #c4b5fd;
+    border: 1px solid rgba(196,181,253,.25);
+}
+.rank-angel .rank-xp-bar-wrap { background: rgba(255,255,255,.1); }
+.rank-angel .rank-xp-bar { background: linear-gradient(90deg, #8b5cf6, #c4b5fd); }
+/* angel shimmer */
+.rank-angel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 40%, rgba(196,181,253,.08) 50%, transparent 60%);
+    background-size: 200% 100%;
+    animation: shimmerSlide 3s ease infinite;
+    pointer-events: none;
+}
+
+/* ════════════════════════════════════════
+   TIER 4: UNICORN — Pastel holographic
+   ════════════════════════════════════════ */
+.rank-unicorn {
+    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+    border: 1px solid transparent;
+    background-clip: padding-box;
+    color: #fff;
+    box-shadow: 0 8px 48px rgba(167,139,250,.35);
+    position: relative;
+}
+.rank-unicorn::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: 21px;
+    background: linear-gradient(135deg, #f472b6, #a78bfa, #67e8f9, #f472b6);
+    background-size: 300% 300%;
+    animation: unicornBorder 4s ease infinite;
+    z-index: -1;
+}
+.rank-unicorn .rank-title-label {
+    background: linear-gradient(90deg, #f9a8d4, #c4b5fd, #a5f3fc);
+    color: #1e1b4b;
+    font-weight: 900;
+}
+.rank-unicorn .rank-xp-bar-wrap { background: rgba(255,255,255,.1); }
+.rank-unicorn .rank-xp-bar {
+    background: linear-gradient(90deg, #f472b6, #a78bfa, #67e8f9);
+    background-size: 200%;
+    animation: unicornBar 2s ease infinite alternate;
+}
+.rank-unicorn .rank-icon { animation: unicornFloat 3s ease-in-out infinite; }
+
+@keyframes unicornBorder {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+@keyframes unicornBar {
+    from { background-position: 0%; }
+    to   { background-position: 100%; }
+}
+@keyframes unicornFloat {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50%       { transform: translateY(-6px) rotate(8deg); }
+}
+
+/* ════════════════════════════════════════
+   TIER 5: TYCOON — Vàng mạ + gold particles
+   ════════════════════════════════════════ */
+.rank-tycoon {
+    background: linear-gradient(135deg, #1a0e00 0%, #3d1f00 50%, #1a0e00 100%);
+    border-color: #d97706;
+    color: #fef3c7;
+    box-shadow: 0 8px 48px rgba(217,119,6,.4), inset 0 1px 0 rgba(251,191,36,.15);
+}
+.rank-tycoon .rank-title-label {
+    background: linear-gradient(90deg, #d97706, #fbbf24, #d97706);
+    background-size: 200%;
+    animation: goldShine 2s ease infinite;
+    color: #1a0e00;
+    font-weight: 900;
+}
+.rank-tycoon .rank-name {
+    background: linear-gradient(90deg, #fbbf24, #fef08a, #f59e0b, #fef08a, #fbbf24);
+    background-size: 300%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: goldText 3s ease infinite;
+}
+.rank-tycoon .rank-xp-bar-wrap { background: rgba(255,255,255,.08); }
+.rank-tycoon .rank-xp-bar {
+    background: linear-gradient(90deg, #d97706, #fbbf24, #fde68a);
+    box-shadow: 0 0 8px rgba(251,191,36,.6);
+}
+/* Gold particles */
+.rank-tycoon .rank-particles {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+.gold-particle {
+    position: absolute;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fef08a, #d97706);
+    opacity: 0;
+    animation: goldFall var(--dur, 3s) var(--delay, 0s) ease-in infinite;
+}
+@keyframes goldFall {
+    0%   { transform: translateY(-10px) translateX(var(--sx, 0)) scale(0); opacity: 0; }
+    15%  { opacity: .9; }
+    80%  { opacity: .4; }
+    100% { transform: translateY(110px) translateX(calc(var(--sx, 0) + var(--drift, 20px))) scale(.4); opacity: 0; }
+}
+@keyframes goldShine {
+    0%   { background-position: 0%; }
+    100% { background-position: 200%; }
+}
+@keyframes goldText {
+    0%   { background-position: 0%; }
+    100% { background-position: 300%; }
+}
+
+/* ════════════════════════════════════════
+   TIER 6: MONOPOLY — Hoàng gia tối thượng
+   ════════════════════════════════════════ */
+.rank-monopoly {
+    background: linear-gradient(135deg, #050505 0%, #0d0d0d 40%, #1a0000 100%);
+    border: none;
+    color: #fff;
+    box-shadow:
+        0 0 0 1px #7c0a0a,
+        0 8px 60px rgba(220,38,38,.35),
+        inset 0 1px 0 rgba(255,255,255,.05);
+    position: relative;
+}
+/* Animated royal border */
+.rank-monopoly::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: 22px;
+    background: conic-gradient(
+        from var(--angle, 0deg),
+        #dc2626, #991b1b, #fbbf24, #d97706,
+        #dc2626, #991b1b, #fbbf24, #dc2626
+    );
+    animation: royalSpin 4s linear infinite;
+    z-index: -1;
+}
+.rank-monopoly::after {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    border-radius: 19px;
+    background: linear-gradient(135deg, #080808 0%, #120000 100%);
+    z-index: -1;
+}
+.rank-monopoly .rank-title-label {
+    background: linear-gradient(90deg, #dc2626, #fbbf24, #dc2626);
+    background-size: 200%;
+    color: #fff;
+    font-weight: 900;
+    text-shadow: 0 1px 3px rgba(0,0,0,.5);
+    animation: goldShine 1.8s ease infinite;
+    border: 1px solid rgba(251,191,36,.3);
+}
+.rank-monopoly .rank-name {
+    background: linear-gradient(90deg, #ef4444, #fbbf24, #fff, #fbbf24, #ef4444);
+    background-size: 300%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: goldText 2.5s ease infinite;
+    font-size: 26px;
+}
+.rank-monopoly .rank-xp-bar-wrap { background: rgba(255,255,255,.08); }
+.rank-monopoly .rank-xp-bar {
+    background: linear-gradient(90deg, #dc2626, #fbbf24, #fff, #fbbf24, #dc2626);
+    background-size: 300%;
+    animation: goldText 2s ease infinite;
+    box-shadow: 0 0 12px rgba(220,38,38,.7), 0 0 24px rgba(251,191,36,.4);
+}
+.rank-monopoly .rank-icon { animation: monopolyPulse 2s ease-in-out infinite; }
+
+@keyframes royalSpin {
+    from { --angle: 0deg; }
+    to   { --angle: 360deg; }
+}
+@keyframes monopolyPulse {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 8px rgba(220,38,38,.6)); }
+    50%       { transform: scale(1.08); filter: drop-shadow(0 0 20px rgba(251,191,36,.9)); }
+}
+
+/* shimmer util */
+@keyframes shimmerSlide {
+    0%   { background-position: -100% 0; }
+    100% { background-position: 200% 0; }
+}
+
+/* ── All rank cards next tier hint rows ── */
+.rank-all-tiers {
+    margin-top: 20px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.rank-tier-pip {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.05);
+    opacity: .5;
+    transition: opacity .2s ease;
+    white-space: nowrap;
+}
+
+.rank-tier-pip.current {
+    opacity: 1;
+    border-color: rgba(255,255,255,.4);
+    background: rgba(255,255,255,.12);
+}
+
+.rank-tier-pip.unlocked {
+    opacity: .85;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+    .rank-card {
+        grid-template-columns: 1fr;
+        gap: 16px;
+        padding: 24px 20px;
+    }
+    .rank-badge-wrap { flex-direction: row; min-width: auto; }
+    .rank-spent-wrap { align-items: flex-start; }
+    .rank-all-tiers { gap: 6px; }
+    .rank-tier-pip { font-size: 10px; padding: 3px 8px; }
+}
