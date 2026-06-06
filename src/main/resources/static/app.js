@@ -442,49 +442,156 @@ async function loadProfile() {
 async function loadAdmin() {
     requireAdmin();
     const dashboard = await api("/api/admin/dashboard");
+
+    const tabTitles = { products: "Sản phẩm", categories: "Danh mục", coupons: "Coupon", orders: "Đơn hàng", users: "Người dùng", stock: "Tồn kho thấp" };
+    const titleEl = document.getElementById("adminTabTitle");
+    if (titleEl) titleEl.textContent = tabTitles[state.adminTab] || "Dashboard";
+
     $("#adminStats").innerHTML = [
-        ["Sản phẩm", dashboard.products],
-        ["Đơn hàng", dashboard.orders],
-        ["Khách hàng", dashboard.customers],
-        ["Doanh thu", money(dashboard.revenue)]
-    ].map(([label, value]) => `<div class="stat"><span class="muted">${label}</span><strong>${value}</strong></div>`).join("");
+        ["📦", "Sản phẩm", dashboard.products, "#0f766e"],
+        ["🛒", "Đơn hàng", dashboard.orders, "#2563eb"],
+        ["👥", "Khách hàng", dashboard.customers, "#7c3aed"],
+        ["💰", "Doanh thu", money(dashboard.revenue), "#d97706"]
+    ].map(([icon, label, value, color]) => `
+        <div class="admin-stat-card">
+            <div class="admin-stat-icon" style="background:${color}18;color:${color}">${icon}</div>
+            <div>
+                <p class="admin-stat-label">${label}</p>
+                <strong class="admin-stat-value">${value}</strong>
+            </div>
+        </div>`).join("");
+
     await renderAdminTab(dashboard);
 }
 
 async function renderAdminTab(dashboard) {
     const panel = $("#adminPanel");
+    panel.innerHTML = `<div style="padding:20px;color:var(--muted)">Đang tải...</div>`;
+
     if (state.adminTab === "products") {
         const products = await api("/api/products");
-        panel.innerHTML = productForm() + table(["Tên", "Giá", "Kho", "Danh mục", ""], products.map(p => [
-            p.name, money(p.price), p.stock, valueOf(p, "category_name", "categoryName") || "", `<button onclick="deleteAdmin('/api/admin/products/${p.id}')">Xóa</button>`
-        ]));
-        $("#productForm").onsubmit = submitProduct;
+        panel.innerHTML = `
+            <div class="admin-form-card">
+                <h3>➕ Thêm sản phẩm mới</h3>
+                ${productForm()}
+            </div>` +
+            table(
+                ["Ảnh", "Tên", "Giá", "Kho", "Danh mục", "Nổi bật", "Thao tác"],
+                products.map(p => [
+                    `<img src="${valueOf(p,"image_url","imageUrl")||""}" style="width:52px;height:44px;object-fit:cover;border-radius:6px;background:#e5e7eb">`,
+                    `<strong>${p.name}</strong>`,
+                    money(p.price),
+                    p.stock,
+                    valueOf(p, "category_name", "categoryName") || "—",
+                    valueOf(p, "featured") ? `<span style="color:#16a34a;font-weight:700">✓</span>` : `<span style="color:#d1d5db">—</span>`,
+                    `<div style="display:flex;gap:6px">
+                        <button onclick="openEditProduct(${p.id})" style="background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8">Sửa</button>
+                        <button onclick="deleteAdmin('/api/admin/products/${p.id}')" style="background:#fef2f2;border-color:#fecaca;color:#b42318">Xóa</button>
+                    </div>`
+                ])
+            );
+        document.getElementById("productForm").onsubmit = submitProduct;
     }
     if (state.adminTab === "categories") {
         const cats = await api("/api/categories");
         panel.innerHTML = `
-            <form id="categoryForm" class="admin-form"><input name="name" placeholder="Tên danh mục" required><input name="description" placeholder="Mô tả"><button class="primary">Thêm</button></form>
-            ${table(["Tên", "Mô tả", ""], cats.map(c => [c.name, c.description || "", `<button onclick="deleteAdmin('/api/admin/categories/${c.id}')">Xóa</button>`]))}`;
-        $("#categoryForm").onsubmit = submitCategory;
+            <div class="admin-form-card">
+                <h3>➕ Thêm danh mục</h3>
+                <form id="categoryForm" class="admin-form" style="margin:0;border:none;box-shadow:none;padding:0;background:transparent">
+                    <input name="name" placeholder="Tên danh mục" required>
+                    <input name="description" placeholder="Mô tả">
+                    <button class="primary">Thêm</button>
+                </form>
+            </div>
+            ${table(["Tên", "Mô tả", "Thao tác"], cats.map(c => [
+                `<strong>${c.name}</strong>`,
+                c.description || `<span class="muted">—</span>`,
+                `<div style="display:flex;gap:6px">
+                    <button onclick="openEditCategory(${c.id},'${encodeURIComponent(c.name)}','${encodeURIComponent(c.description||'')}' )" style="background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8">Sửa</button>
+                    <button onclick="deleteAdmin('/api/admin/categories/${c.id}')" style="background:#fef2f2;border-color:#fecaca;color:#b42318">Xóa</button>
+                </div>`
+            ]))}`;
+        document.getElementById("categoryForm").onsubmit = submitCategory;
     }
     if (state.adminTab === "coupons") {
         const coupons = await api("/api/admin/coupons");
+        const fmtDate = d => d ? new Date(d).toLocaleDateString("vi-VN") : "—";
         panel.innerHTML = `
-            <form id="couponForm" class="admin-form">
-                <input name="code" placeholder="Code" required><input name="discountPercent" type="number" placeholder="% giảm" required>
-                <input name="startDate" type="date"><input name="endDate" type="date"><button class="primary">Thêm</button>
-            </form>
-            ${table(["Code", "%", "Active", "Từ", "Đến", ""], coupons.map(c => [c.code, c.discount_percent, c.active, c.start_date || "", c.end_date || "", `<button onclick="deleteAdmin('/api/admin/coupons/${c.id}')">Xóa</button>`]))}`;
-        $("#couponForm").onsubmit = submitCoupon;
+            <div class="admin-form-card">
+                <h3>➕ Thêm mã giảm giá</h3>
+                <form id="couponForm" class="admin-form" style="margin:0;border:none;box-shadow:none;padding:0;background:transparent">
+                    <input name="code" placeholder="Mã code (VD: SALE20)" required>
+                    <input name="discountPercent" type="number" min="1" max="100" placeholder="% giảm" required>
+                    <label style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3px">Ngày bắt đầu<input name="startDate" type="date" style="margin:0"></label>
+                    <label style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3px">Ngày kết thúc<input name="endDate" type="date" style="margin:0"></label>
+                    <button class="primary">Thêm</button>
+                </form>
+            </div>
+            ${table(["Code", "% Giảm", "Trạng thái", "Từ ngày", "Đến ngày", "Thao tác"], coupons.map(c => [
+                `<strong style="font-family:monospace;font-size:14px">${c.code}</strong>`,
+                `<span style="font-weight:800;color:var(--primary-dark)">${c.discount_percent}%</span>`,
+                c.active
+                    ? `<span class="badge" style="background:#ecfdf3;color:#027a48">✓ Đang bật</span>`
+                    : `<span class="badge" style="background:#f3f4f6;color:#6b7280">✗ Tắt</span>`,
+                fmtDate(c.start_date),
+                fmtDate(c.end_date),
+                `<div style="display:flex;gap:6px;flex-wrap:wrap">
+                    <button onclick="openEditCoupon(${c.id})" style="background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8">Sửa</button>
+                    <button onclick="toggleCoupon(${c.id},${c.active})" style="background:${c.active?'#fff7ed':'#ecfdf3'};border-color:${c.active?'#fed7aa':'#bbf7d0'};color:${c.active?'#b45309':'#027a48'}">${c.active ? 'Tắt' : 'Bật'}</button>
+                    <button onclick="deleteAdmin('/api/admin/coupons/${c.id}')" style="background:#fef2f2;border-color:#fecaca;color:#b42318">Xóa</button>
+                </div>`
+            ]))}`;
+        document.getElementById("couponForm").onsubmit = submitCoupon;
     }
     if (state.adminTab === "orders") {
         const orders = await api("/api/admin/orders");
-        panel.innerHTML = table(["Mã", "Khách", "Tổng", "Trạng thái", ""], orders.map(o => [
-            `#${o.id}`, o.username, money(o.total_amount), o.status,
+        const statusLabel = { PENDING: "Chờ xác nhận", CONFIRMED: "Đã xác nhận", SHIPPING: "Đang giao", DELIVERED: "Đã nhận", CANCELLED: "Đã hủy" };
+        const statusOpts = [
+            ["PENDING",   "Chờ xác nhận"],
+            ["CONFIRMED", "Đã xác nhận"],
+            ["SHIPPING",  "Đang giao"],
+            ["DELIVERED", "Đã nhận hàng"],
+            ["CANCELLED", "Đã hủy"]
+        ];
+        panel.innerHTML = table(["Mã", "Khách", "Tổng", "Trạng thái", "Cập nhật"], orders.map(o => [
+            `#${o.id}`, o.username, money(o.total_amount),
+            `<span class="badge status-${String(o.status).toLowerCase()}">${statusLabel[o.status] || o.status}</span>`,
             `<select onchange="updateOrder(${o.id}, this.value)">
-                ${["PENDING","CONFIRMED","SHIPPING","DELIVERED","CANCELLED"].map(s => `<option ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}
+                ${statusOpts.map(([val, label]) => `<option value="${val}" ${val === o.status ? "selected" : ""}>${label}</option>`).join("")}
             </select>`
         ]));
+    }
+    if (state.adminTab === "users") {
+        try {
+            const users = await api("/api/admin/users");
+            if (!users || users.length === 0) {
+                panel.innerHTML = `<div style="padding:32px;text-align:center;color:var(--muted)">Chưa có người dùng nào.</div>`;
+                return;
+            }
+            panel.innerHTML = table(
+                ["ID", "Avatar", "Username", "Họ tên", "Email", "SĐT", "Vai trò", "Thao tác"],
+                users.map(u => [
+                    u.id,
+                    `<img src="${u.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(u.username)}`}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;background:#e5e7eb">`,
+                    `<strong>${u.username}</strong>`,
+                    u.full_name || u.fullName || "—",
+                    u.email,
+                    u.phone || "—",
+                    `<span class="badge ${u.role === "ADMIN" ? "badge-admin" : ""}">${u.role === "ADMIN" ? "👑 Admin" : "🛍️ Khách hàng"}</span>`,
+                    u.role !== "ADMIN"
+                        ? `<div style="display:flex;gap:6px">
+                            <button onclick="openUserDetail(${u.id})" style="background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8">Chi tiết</button>
+                            <button onclick="deleteAdmin('/api/admin/users/${u.id}')" style="background:#fef2f2;border-color:#fecaca;color:#b42318">Xóa</button>
+                           </div>`
+                        : `<button onclick="openUserDetail(${u.id})" style="background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8">Chi tiết</button>`
+                ])
+            );
+        } catch (err) {
+            panel.innerHTML = `<div style="padding:24px;background:#fef2f2;border-radius:8px;color:#b42318;border:1px solid #fecaca">
+                <strong>Lỗi tải danh sách người dùng:</strong> ${err.message}<br>
+                <small style="color:var(--muted);margin-top:6px;display:block">Hãy restart server để áp dụng API mới.</small>
+            </div>`;
+        }
     }
     if (state.adminTab === "stock") {
         panel.innerHTML = table(["Mã", "Sản phẩm", "Tồn kho"], (dashboard.lowStock || []).map(p => [p.id, p.name, p.stock]));
@@ -495,10 +602,13 @@ function productForm() {
     return `
         <form id="productForm" class="admin-form">
             <input name="name" placeholder="Tên sản phẩm" required>
-            <input name="price" type="number" placeholder="Giá" required>
-            <input name="stock" type="number" placeholder="Tồn kho" required>
+            <input name="price" type="number" min="0" placeholder="Giá (VNĐ)" required>
+            <input name="stock" type="number" min="0" placeholder="Tồn kho" required>
             <select name="categoryId">${state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join("")}</select>
-            <input name="discountPercent" type="number" placeholder="% giảm" value="0">
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)">
+                % Giảm giá
+                <input name="discountPercent" type="number" min="0" max="100" value="0" style="margin:0">
+            </label>
             <div class="upload-field">
                 <input name="imageUrl" id="productImageUrl" placeholder="URL ảnh sản phẩm">
                 <label class="upload-btn">
@@ -506,9 +616,9 @@ function productForm() {
                     <input type="file" accept="image/*" onchange="uploadProductImage(this)" class="hidden">
                 </label>
             </div>
-            <label><input name="featured" type="checkbox"> Nổi bật</label>
-            <textarea name="description" placeholder="Mô tả"></textarea>
-            <button class="primary">Thêm sản phẩm</button>
+            <label style="display:flex;align-items:center;gap:6px"><input name="featured" type="checkbox"> Nổi bật</label>
+            <textarea name="description" placeholder="Mô tả" style="grid-column:span 2"></textarea>
+            <button class="primary" style="grid-column:span 4">Thêm sản phẩm</button>
         </form>`;
 }
 
@@ -547,6 +657,254 @@ async function submitProduct(event) {
     });
     toast("Đã thêm sản phẩm");
     await loadAdmin();
+}
+
+async function openEditProduct(id) {
+    const p = await api(`/api/products/${id}`);
+    // Xóa modal cũ nếu có
+    document.getElementById("editProductModal")?.remove();
+
+    const modal = document.createElement("dialog");
+    modal.id = "editProductModal";
+    modal.style.cssText = "width:min(640px,calc(100vw - 24px));border:1px solid var(--line);border-radius:12px;padding:0;box-shadow:var(--shadow)";
+    modal.innerHTML = `
+        <form id="editProductForm" class="form dialog-form" style="padding:20px;display:grid;gap:12px">
+            <div class="section-head" style="margin-bottom:4px">
+                <h3 style="margin:0">Sửa sản phẩm #${p.id}</h3>
+                <button type="button" onclick="document.getElementById('editProductModal').close()">✕</button>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                <input name="name" placeholder="Tên sản phẩm" value="${p.name || ""}" required>
+                <input name="price" type="number" min="0" placeholder="Giá" value="${p.price || 0}" required>
+                <input name="stock" type="number" min="0" placeholder="Tồn kho" value="${p.stock || 0}" required>
+                <select name="categoryId">
+                    ${state.categories.map(c => `<option value="${c.id}" ${c.id == valueOf(p,"category_id","categoryId") ? "selected" : ""}>${c.name}</option>`).join("")}
+                </select>
+                <input name="discountPercent" type="number" min="0" max="100" placeholder="% giảm (0-100)" value="${valueOf(p,"discount_percent","discountPercent") || 0}">
+                <label style="display:flex;align-items:center;gap:8px;font-size:14px">
+                    <input name="featured" type="checkbox" ${p.featured ? "checked" : ""}> Nổi bật
+                </label>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+                <img id="editImgPreview" src="${valueOf(p,"image_url","imageUrl")||""}"
+                     style="width:64px;height:56px;object-fit:cover;border-radius:8px;background:#e5e7eb;flex-shrink:0">
+                <div class="upload-field" style="flex:1">
+                    <input name="imageUrl" id="editProductImageUrl" placeholder="URL ảnh" value="${valueOf(p,"image_url","imageUrl")||""}">
+                    <label class="upload-btn">
+                        📁 Tải lên
+                        <input type="file" accept="image/*" onchange="uploadEditProductImage(this)" class="hidden">
+                    </label>
+                </div>
+            </div>
+            <textarea name="description" placeholder="Mô tả" rows="3">${p.description || ""}</textarea>
+            <div style="display:flex;gap:10px;justify-content:flex-end">
+                <button type="button" onclick="document.getElementById('editProductModal').close()">Hủy</button>
+                <button type="submit" class="primary">Lưu thay đổi</button>
+            </div>
+        </form>`;
+    document.body.appendChild(modal);
+    modal.showModal();
+    document.getElementById("editProductForm").onsubmit = async (e) => {
+        e.preventDefault();
+        const form = new FormData(e.target);
+        await api(`/api/admin/products/${id}`, {
+            method: "PUT",
+            body: JSON.stringify({
+                name: form.get("name"),
+                description: form.get("description"),
+                price: Number(form.get("price")),
+                stock: Number(form.get("stock")),
+                imageUrl: form.get("imageUrl") || valueOf(p,"image_url","imageUrl") || "",
+                categoryId: Number(form.get("categoryId")),
+                featured: form.get("featured") === "on",
+                discountPercent: Math.min(100, Math.max(0, Number(form.get("discountPercent") || 0)))
+            })
+        });
+        modal.close();
+        toast("Đã cập nhật sản phẩm");
+        await loadAdmin();
+    };
+}
+
+async function uploadEditProductImage(input) {
+    const file = input.files[0];
+    if (!file) return;
+    try {
+        toast("Đang tải ảnh...");
+        const url = await uploadFile(file);
+        document.getElementById("editProductImageUrl").value = url;
+        document.getElementById("editImgPreview").src = url;
+        toast("Ảnh đã sẵn sàng");
+    } catch (err) {
+        toast(err.message);
+    }
+}
+
+// ── Modal sửa danh mục ──
+function openEditCategory(id, encodedName, encodedDesc) {
+    const name = decodeURIComponent(encodedName);
+    const desc = decodeURIComponent(encodedDesc);
+    document.getElementById("editCategoryModal")?.remove();
+    const modal = document.createElement("dialog");
+    modal.id = "editCategoryModal";
+    modal.style.cssText = "width:min(440px,calc(100vw - 24px));border:1px solid var(--line);border-radius:12px;padding:0;box-shadow:var(--shadow)";
+    modal.innerHTML = `
+        <form id="editCategoryForm" class="form dialog-form" style="padding:20px;display:grid;gap:12px">
+            <div class="section-head" style="margin-bottom:4px">
+                <h3 style="margin:0">Sửa danh mục</h3>
+                <button type="button" onclick="document.getElementById('editCategoryModal').close()">✕</button>
+            </div>
+            <input name="name" placeholder="Tên danh mục" value="${name}" required>
+            <input name="description" placeholder="Mô tả" value="${desc}">
+            <div style="display:flex;gap:10px;justify-content:flex-end">
+                <button type="button" onclick="document.getElementById('editCategoryModal').close()">Hủy</button>
+                <button type="submit" class="primary">Lưu</button>
+            </div>
+        </form>`;
+    document.body.appendChild(modal);
+    modal.showModal();
+    document.getElementById("editCategoryForm").onsubmit = async e => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        await api(`/api/admin/categories/${id}`, { method: "PUT", body: JSON.stringify(Object.fromEntries(fd)) });
+        modal.close();
+        toast("Đã cập nhật danh mục");
+        await loadBase();
+        await loadAdmin();
+    };
+}
+
+// ── Modal sửa coupon ──
+async function openEditCoupon(id) {
+    const coupons = await api("/api/admin/coupons");
+    const c = coupons.find(x => x.id === id);
+    if (!c) return;
+    const toInput = d => d ? new Date(d).toISOString().split("T")[0] : "";
+    document.getElementById("editCouponModal")?.remove();
+    const modal = document.createElement("dialog");
+    modal.id = "editCouponModal";
+    modal.style.cssText = "width:min(500px,calc(100vw - 24px));border:1px solid var(--line);border-radius:12px;padding:0;box-shadow:var(--shadow)";
+    modal.innerHTML = `
+        <form id="editCouponForm" class="form dialog-form" style="padding:20px;display:grid;gap:12px">
+            <div class="section-head" style="margin-bottom:4px">
+                <h3 style="margin:0">Sửa coupon</h3>
+                <button type="button" onclick="document.getElementById('editCouponModal').close()">✕</button>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                <input name="code" placeholder="Mã code" value="${c.code}" required>
+                <input name="discountPercent" type="number" min="1" max="100" placeholder="% giảm" value="${c.discount_percent}" required>
+                <label style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3px">
+                    Ngày bắt đầu<input name="startDate" type="date" value="${toInput(c.start_date)}" style="margin:0">
+                </label>
+                <label style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3px">
+                    Ngày kết thúc<input name="endDate" type="date" value="${toInput(c.end_date)}" style="margin:0">
+                </label>
+            </div>
+            <label style="display:flex;align-items:center;gap:8px;font-size:14px">
+                <input name="active" type="checkbox" ${c.active ? "checked" : ""}> Kích hoạt coupon
+            </label>
+            <div style="display:flex;gap:10px;justify-content:flex-end">
+                <button type="button" onclick="document.getElementById('editCouponModal').close()">Hủy</button>
+                <button type="submit" class="primary">Lưu thay đổi</button>
+            </div>
+        </form>`;
+    document.body.appendChild(modal);
+    modal.showModal();
+    document.getElementById("editCouponForm").onsubmit = async e => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        await api(`/api/admin/coupons/${id}`, {
+            method: "PUT",
+            body: JSON.stringify({
+                code: fd.get("code"),
+                discountPercent: Number(fd.get("discountPercent")),
+                active: fd.get("active") === "on",
+                startDate: fd.get("startDate") || null,
+                endDate: fd.get("endDate") || null
+            })
+        });
+        modal.close();
+        toast("Đã cập nhật coupon");
+        await loadAdmin();
+    };
+}
+
+async function toggleCoupon(id, currentActive) {
+    const coupons = await api("/api/admin/coupons");
+    const c = coupons.find(x => x.id === id);
+    if (!c) return;
+    const toInput = d => d ? new Date(d).toISOString().split("T")[0] : null;
+    await api(`/api/admin/coupons/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+            code: c.code, discountPercent: c.discount_percent,
+            active: !currentActive,
+            startDate: toInput(c.start_date), endDate: toInput(c.end_date)
+        })
+    });
+    toast(currentActive ? "Đã tắt coupon" : "Đã bật coupon");
+    await loadAdmin();
+}
+
+// ── Modal chi tiết người dùng ──
+async function openUserDetail(userId) {
+    let users, orders;
+    try {
+        [users, orders] = await Promise.all([api("/api/admin/users"), api("/api/admin/orders")]);
+    } catch (e) { toast(e.message); return; }
+    const u = users.find(x => x.id === userId);
+    if (!u) return;
+    const userOrders = orders.filter(o => (o.user_id || o.userId) === userId);
+    const totalSpent = userOrders.filter(o => String(o.status) === "DELIVERED")
+        .reduce((s, o) => s + Number(o.total_amount || 0), 0);
+    const { rank, pct, nextName, needed } = getRankProgress(totalSpent);
+    document.getElementById("userDetailModal")?.remove();
+    const modal = document.createElement("dialog");
+    modal.id = "userDetailModal";
+    modal.style.cssText = "width:min(520px,calc(100vw - 24px));border:1px solid var(--line);border-radius:16px;padding:0;box-shadow:var(--shadow)";
+    const avatarSrc = u.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(u.username)}`;
+    const rankNextHint = nextName ? `Cần thêm ${money(needed)} để lên <strong>${nextName}</strong>` : "Đã đạt cấp tối đa";
+    modal.innerHTML = `
+        <div style="padding:24px;display:grid;gap:20px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                <div style="display:flex;align-items:center;gap:16px">
+                    <img src="${avatarSrc}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:3px solid var(--line)">
+                    <div>
+                        <h3 style="margin:0;font-size:20px">${u.full_name || u.fullName || u.username}</h3>
+                        <p style="margin:2px 0 0;color:var(--muted);font-size:13px">@${u.username} · ${u.email}</p>
+                        <span class="badge ${u.role === "ADMIN" ? "badge-admin" : ""}" style="margin-top:6px;display:inline-flex">${u.role === "ADMIN" ? "👑 Admin" : "🛍️ Khách hàng"}</span>
+                    </div>
+                </div>
+                <button type="button" onclick="document.getElementById('userDetailModal').close()" style="min-height:32px;padding:4px 12px">✕</button>
+            </div>
+            <div class="rank-card ${rank.cssClass}" style="grid-template-columns:auto 1fr;gap:16px;padding:20px 24px">
+                <div class="rank-badge-wrap" style="min-width:70px">
+                    <span class="rank-icon" style="font-size:40px">${rank.icon}</span>
+                    <span class="rank-title-label">${rank.id.toUpperCase()}</span>
+                </div>
+                <div class="rank-middle" style="gap:8px">
+                    <h3 class="rank-name" style="font-size:18px">${rank.name} <span style="font-size:13px;font-weight:500;opacity:.6">· ${rank.subtitle}</span></h3>
+                    <div class="rank-xp-row">
+                        <div class="rank-xp-bar-wrap" style="flex:1"><div class="rank-xp-bar" style="width:${pct}%"></div></div>
+                        <span class="rank-xp-pct">${pct}%</span>
+                    </div>
+                    <span class="rank-next-hint" style="font-size:12px">${rankNextHint}</span>
+                    <div style="display:flex;align-items:baseline;gap:6px;margin-top:2px">
+                        <strong style="font-size:17px">${money(totalSpent)}</strong>
+                        <span style="font-size:11px;opacity:.5;text-transform:uppercase;letter-spacing:.06em">Tổng chi tiêu</span>
+                    </div>
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                ${[["SĐT", u.phone||"Chưa cập nhật"],["Địa chỉ", u.address||"Chưa cập nhật"],
+                   ["Tổng đơn", userOrders.length+" đơn"],["Đã nhận", userOrders.filter(o=>o.status==="DELIVERED").length+" đơn"]
+                  ].map(([l,v])=>`<div style="background:#f8fafc;border-radius:8px;padding:12px 14px;border:1px solid var(--line)">
+                    <p style="margin:0;font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em">${l}</p>
+                    <p style="margin:4px 0 0;font-size:14px;font-weight:600">${v}</p></div>`).join("")}
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+    modal.showModal();
 }
 
 async function submitCategory(event) {
@@ -671,13 +1029,14 @@ $("#checkoutForm").onsubmit = async event => {
 $("#reloadProducts").onclick = loadProducts;
 $("#searchInput").addEventListener("input", () => loadProducts().catch(console.error));
 $("#categoryFilter").addEventListener("change", () => loadProducts().catch(console.error));
-document.querySelectorAll("[data-admin-tab]").forEach(button => {
-    button.onclick = async () => {
-        document.querySelectorAll("[data-admin-tab]").forEach(b => b.classList.remove("active"));
-        button.classList.add("active");
-        state.adminTab = button.dataset.adminTab;
-        await loadAdmin();
-    };
+// Admin nav — event delegation để tránh stale closure
+document.getElementById("adminView").addEventListener("click", async e => {
+    const btn = e.target.closest("[data-admin-tab]");
+    if (!btn) return;
+    document.querySelectorAll("[data-admin-tab]").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    state.adminTab = btn.dataset.adminTab;
+    await loadAdmin();
 });
 
 window.addEventListener("error", event => {
@@ -984,7 +1343,6 @@ function renderGoldParticles() {
 function renderRankCard(totalSpent) {
     const { rank, pct, nextName, needed } = getRankProgress(totalSpent);
     const isTycoon   = rank.id === "tycoon";
-    const isMonopoly = rank.id === "monopoly";
     const isMaxRank  = rank.id === "monopoly";
 
     const xpLabel = isMaxRank
@@ -995,7 +1353,7 @@ function renderRankCard(totalSpent) {
         ? "Bạn đã chinh phục MiniShop."
         : `Còn ${money(needed)} để lên <strong>${nextName}</strong>`;
 
-    const tierPips = RANKS.map((r, i) => {
+    const tierPips = RANKS.map(r => {
         const current  = r.id === rank.id;
         const unlocked = totalSpent >= r.minSpent;
         return `<span class="rank-tier-pip ${current ? "current" : ""} ${unlocked && !current ? "unlocked" : ""}">
@@ -1003,9 +1361,11 @@ function renderRankCard(totalSpent) {
         </span>`;
     }).join("");
 
-    return `
-    <div class="rank-card ${rank.cssClass}">
-        ${isTycoon || isMonopoly ? renderGoldParticles() : ""}
+    // Trả về nội dung, wrapper div sẽ nhận class từ loadRankCard
+    return {
+        cssClass: rank.cssClass,
+        html: `
+        ${isTycoon || rank.id === "monopoly" ? renderGoldParticles() : ""}
         <div class="rank-badge-wrap">
             <span class="rank-icon">${rank.icon}</span>
             <span class="rank-title-label">${rank.id.toUpperCase()}</span>
@@ -1026,33 +1386,38 @@ function renderRankCard(totalSpent) {
         <div class="rank-spent-wrap">
             <span class="rank-spent-value">${money(totalSpent)}</span>
             <span class="rank-spent-label">Tổng chi tiêu</span>
-        </div>
-    </div>`;
+        </div>`
+    };
 }
 
 // Hook vào loadProfile để load rank card cùng lúc
 async function loadRankCard() {
     const rankCardEl = document.getElementById("rankCard");
     if (!rankCardEl || !state.user) return;
+
+    let totalSpent = 0;
     try {
         const orders = await api("/api/orders");
-        const totalSpent = orders
+        totalSpent = orders
             .filter(o => String(o.status) === "DELIVERED")
             .reduce((sum, o) => sum + Number(valueOf(o, "total_amount", "totalAmount") || 0), 0);
-        rankCardEl.innerHTML = renderRankCard(totalSpent);
-        rankCardEl.classList.remove("hidden");
-        requestAnimationFrame(() => {
-            setTimeout(() => {
-                const bar = document.getElementById("rankXpBar");
-                if (bar) {
-                    const { pct } = getRankProgress(totalSpent);
-                    bar.style.width = pct + "%";
-                }
-            }, 120);
-        });
-    } catch (e) {
-        rankCardEl.classList.add("hidden");
+    } catch (_) {
+        // Chưa có đơn hoặc lỗi → giữ 0, vẫn hiện Shopper
     }
+
+    const { cssClass, html } = renderRankCard(totalSpent);
+
+    // Reset classes, áp đúng tier class
+    rankCardEl.className = "rank-card " + cssClass;
+    rankCardEl.innerHTML = html;
+
+    // Animate XP bar
+    requestAnimationFrame(() => {
+        setTimeout(() => {
+            const bar = document.getElementById("rankXpBar");
+            if (bar) bar.style.width = getRankProgress(totalSpent).pct + "%";
+        }, 100);
+    });
 }
 
 loadBase().catch(error => toast(error.message));

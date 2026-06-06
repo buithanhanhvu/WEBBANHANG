@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Mini E-Commerce</title>
-<link rel="stylesheet" href="/styles.css?v=4">
+<link rel="stylesheet" href="/styles.css?v=10">
     <!-- SockJS + STOMP cho WebSocket realtime -->
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
@@ -145,7 +145,7 @@
             </div>
         </div>
         <!-- RANK CARD - full width trên profile layout -->
-        <div id="rankCard" class="rank-card hidden"></div>
+        <div id="rankCard" class="hidden"></div>
 
         <div class="profile-layout">
             <div class="panel profile-card">
@@ -174,21 +174,52 @@
     </section>
 
     <section id="adminView" class="view hidden">
-        <div class="section-head">
-            <div>
-                <p class="eyebrow">Admin</p>
-                <h2>Dashboard quản trị</h2>
+        <div class="admin-layout">
+            <!-- Sidebar -->
+            <aside class="admin-sidebar">
+                <div class="admin-sidebar-head">
+                    <span class="admin-logo">⚡ Admin</span>
+                </div>
+                <nav class="admin-nav">
+                    <button class="admin-nav-item active" data-admin-tab="products">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+                        Sản phẩm
+                    </button>
+                    <button class="admin-nav-item" data-admin-tab="categories">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                        Danh mục
+                    </button>
+                    <button class="admin-nav-item" data-admin-tab="coupons">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                        Coupon
+                    </button>
+                    <button class="admin-nav-item" data-admin-tab="orders">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                        Đơn hàng
+                    </button>
+                    <button class="admin-nav-item" data-admin-tab="users">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+                        Người dùng
+                    </button>
+                    <button class="admin-nav-item" data-admin-tab="stock">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                        Tồn kho thấp
+                    </button>
+                </nav>
+            </aside>
+
+            <!-- Main content -->
+            <div class="admin-main">
+                <div class="admin-topbar">
+                    <div>
+                        <p class="eyebrow" style="margin:0">ADMIN</p>
+                        <h2 id="adminTabTitle" style="margin:0;font-size:22px;font-weight:800">Dashboard</h2>
+                    </div>
+                </div>
+                <div id="adminStats" class="admin-stats-grid"></div>
+                <div id="adminPanel" class="admin-panel-body"></div>
             </div>
         </div>
-        <div id="adminStats" class="stats"></div>
-        <div class="admin-tabs">
-            <button data-admin-tab="products" class="active">Sản phẩm</button>
-            <button data-admin-tab="categories">Danh mục</button>
-            <button data-admin-tab="coupons">Coupon</button>
-            <button data-admin-tab="orders">Đơn hàng</button>
-            <button data-admin-tab="stock">Tồn kho</button>
-        </div>
-        <div id="adminPanel" class="panel"></div>
     </section>
 </main>
 
@@ -211,6 +242,6 @@
 </dialog>
 
 <div id="toast"></div>
-<script src="/app.js?v=5"></script>
+<script src="/app.js?v=10"></script>
 </body>
 </html>

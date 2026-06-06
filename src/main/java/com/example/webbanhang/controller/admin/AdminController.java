@@ -116,6 +116,21 @@ public class AdminController {
         return ApiResponse.ok("Deleted", null);
     }
 
+    // ── Users ──
+
+    @GetMapping("/users")
+    public ApiResponse<List<Map<String, Object>>> users(HttpServletRequest request) {
+        currentUserService.requireAdmin(request);
+        return ApiResponse.ok(shopService.allUsers());
+    }
+
+    @DeleteMapping("/users/{id}")
+    public ApiResponse<Void> deleteUser(@PathVariable long id, HttpServletRequest request) {
+        currentUserService.requireAdmin(request);
+        shopService.deleteUser(id);
+        return ApiResponse.ok("Deleted", null);
+    }
+
     // ── Orders ──
 
     @GetMapping("/orders")

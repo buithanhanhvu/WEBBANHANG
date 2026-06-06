@@ -253,6 +253,24 @@ public class ShopService {
                 """, productId);
     }
 
+    public List<Map<String, Object>> allUsers() {
+        return jdbc.queryForList(
+            "SELECT id, username, full_name, email, phone, address, role, avatar_url FROM users ORDER BY id DESC"
+        );
+    }
+
+    public void deleteUser(long id) {
+        // Không cho xóa admin
+        List<Map<String, Object>> rows = jdbc.queryForList("SELECT role FROM users WHERE id=?", id);
+        if (rows.isEmpty()) throw new com.example.webbanhang.exception.ResourceNotFoundException("User not found");
+        if ("ADMIN".equals(rows.get(0).get("role"))) {
+            throw new com.example.webbanhang.exception.BadRequestException("Cannot delete admin account");
+        }
+        jdbc.update("DELETE FROM cart_items WHERE user_id=?", id);
+        jdbc.update("DELETE FROM reviews WHERE user_id=?", id);
+        jdbc.update("DELETE FROM users WHERE id=?", id);
+    }
+
     public Map<String, Object> dashboard() {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("products", jdbc.queryForObject("SELECT COUNT(*) FROM products", Long.class));
