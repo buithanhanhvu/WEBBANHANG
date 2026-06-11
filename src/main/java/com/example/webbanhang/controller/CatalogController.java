@@ -30,10 +30,15 @@ public class CatalogController {
     }
 
     @GetMapping("/products")
-    public ApiResponse<List<Map<String, Object>>> products(@RequestParam(required = false) String search,
-                                                           @RequestParam(required = false) Long categoryId,
-                                                           @RequestParam(required = false) Boolean featured) {
-        return ApiResponse.ok(catalogService.products(search, categoryId, featured));
+    public ApiResponse<List<Map<String, Object>>> products(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Boolean featured,
+            @RequestParam(required = false) java.math.BigDecimal minPrice,
+            @RequestParam(required = false) java.math.BigDecimal maxPrice,
+            @RequestParam(required = false) Double minRating,
+            @RequestParam(required = false) String sortBy) {
+        return ApiResponse.ok(catalogService.products(search, categoryId, featured, minPrice, maxPrice, minRating, sortBy));
     }
 
     @GetMapping("/products/{id}")
@@ -44,5 +49,10 @@ public class CatalogController {
     @GetMapping("/products/{id}/reviews")
     public ApiResponse<List<Map<String, Object>>> productReviews(@PathVariable long id) {
         return ApiResponse.ok(shopService.productReviews(id));
+    }
+
+    @GetMapping("/products/{id}/price-history")
+    public ApiResponse<List<Map<String, Object>>> priceHistory(@PathVariable long id) {
+        return ApiResponse.ok(catalogService.priceHistory(id));
     }
 }

@@ -1,9 +1,9 @@
 const state = {
     token: localStorage.getItem("token"),
-    user: JSON.parse(localStorage.getItem("user") || "null"),
+    user: (() => { try { return JSON.parse(localStorage.getItem("user") || "null"); } catch { return null; } })(),
     products: [],
     categories: [],
-    adminTab: "products",
+    adminTab: "dashboard",
     selectedOrderId: null
 };
 
@@ -13,12 +13,33 @@ const valueOf = (obj, ...keys) => keys.map(key => obj?.[key]).find(value => valu
 const avatarFor = user => valueOf(user, "avatarUrl", "avatar_url") || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(valueOf(user, "fullName", "username") || "MiniShop")}`;
 const formatDate = value => value ? new Intl.DateTimeFormat("vi-VN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "";
 
+// XSS prevention — escape tất cả user content trước khi render vào innerHTML
+const esc = str => String(str ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+// Debounce helper
+function debounce(fn, ms) {
+    let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+}
+
 async function api(path, options = {}) {
     const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
     if (state.token) headers.Authorization = `Bearer ${state.token}`;
     const response = await fetch(path, { ...options, headers });
     const body = await response.json();
-    if (!response.ok || !body.success) throw new Error(body.message || "Có lỗi xảy ra");
+    if (!response.ok || !body.success) {
+        if (state.user && (response.status === 401 || (body.message && (body.message.includes("không tồn tại") || body.message.includes("bị khóa") || body.message.includes("bị xóa"))))) {
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+            state.token = null;
+            state.user = null;
+            state.selectedOrderId = null;
+            syncAuthUi();
+            show("home");
+            alert(body.message || "Tài khoản của bạn đã bị khóa hoặc bị xóa. Vui lòng đăng nhập lại.");
+            throw new Error("SESSION_EXPIRED");
+        }
+        throw new Error(body.message || "Có lỗi xảy ra");
+    }
     return body.data;
 }
 
@@ -30,13 +51,25 @@ function toast(message) {
 }
 
 function show(view) {
+    const target = document.getElementById(`${view}View`);
     document.querySelectorAll(".view").forEach(node => node.classList.add("hidden"));
-    $(`#${view}View`).classList.remove("hidden");
+    if (!target) {
+        const notFound = document.getElementById("notFoundView");
+        if (notFound) {
+            notFound.classList.remove("hidden");
+        }
+        return;
+    }
+    target.classList.remove("hidden");
     if (view === "products") loadProducts();
     if (view === "cart") loadCart();
+    if (view === "wishlist") loadWishlist();
     if (view === "orders") loadOrders();
+    if (view === "vouchers") loadVouchers();
+    if (view === "userStats") loadUserStats();
+    if (view === "reviews") loadReviews();
     if (view === "profile") loadProfile();
-    if (view === "admin") loadAdmin();
+    if (view === "admin") { state.adminPage = 1; loadAdmin(); }
 }
 
 function syncAuthUi() {
@@ -48,32 +81,53 @@ function syncAuthUi() {
     });
     if (isLoggedIn) {
         const profileBtn = $("#profileButton");
-        profileBtn.innerHTML = `<img class="topbar-avatar" src="${avatarFor(state.user)}" alt=""> ${valueOf(state.user, "fullName", "username") || "Tài khoản"}`;
+        profileBtn.innerHTML = `<img class="topbar-avatar" src="${esc(avatarFor(state.user))}" alt=""> ${esc(valueOf(state.user, "fullName", "username") || "Tài khoản")}`;
+        loadWishlistNotifications().catch(() => {});
+    } else {
+        const badge = document.getElementById("notifCount");
+        if (badge) badge.style.display = "none";
     }
 }
 
 async function loadBase() {
     state.categories = await api("/api/categories");
     $("#categoryFilter").innerHTML = `<option value="">Tất cả danh mục</option>` +
-        state.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+        state.categories.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
     await loadProducts();
     await loadHome();
     syncAuthUi();
+    updateCartBadge();
+    initGoogleSignIn();
 }
 
 async function loadHome() {
     const featured = await api("/api/products?featured=true");
     $("#featuredProducts").innerHTML = featured.map(productCard).join("");
+    updateWishlistButtons().catch(() => {});
 }
 
 async function loadProducts() {
     const query = new URLSearchParams();
-    const search = $("#searchInput").value.trim();
+    const search    = $("#searchInput").value.trim();
     const categoryId = $("#categoryFilter").value;
-    if (search) query.set("search", search);
+    const minPrice  = document.getElementById("filterMinPrice")?.value.trim();
+    const maxPrice  = document.getElementById("filterMaxPrice")?.value.trim();
+    const minRating = document.getElementById("filterMinRating")?.value;
+    const sortBy    = document.getElementById("filterSort")?.value || "newest";
+    if (search)     query.set("search", search);
     if (categoryId) query.set("categoryId", categoryId);
+    if (minPrice)   query.set("minPrice", minPrice);
+    if (maxPrice)   query.set("maxPrice", maxPrice);
+    if (minRating)  query.set("minRating", minRating);
+    if (sortBy)     query.set("sortBy", sortBy);
     state.products = await api(`/api/products?${query.toString()}`);
-    $("#productsGrid").innerHTML = state.products.map(productCard).join("") || `<p class="muted">Không có sản phẩm phù hợp.</p>`;
+    $("#productsGrid").innerHTML = state.products.map(productCard).join("") || `
+        <div class="empty-state">
+            <div class="empty-icon" style="font-size:48px">🔍</div>
+            <p>Không tìm thấy sản phẩm phù hợp.</p>
+            <button class="cta-ghost" onclick="document.getElementById('clearFilters')?.click()">Xóa bộ lọc</button>
+        </div>`;
+    updateWishlistButtons().catch(() => {});
 }
 
 function productCard(p) {
@@ -85,13 +139,14 @@ function productCard(p) {
     return `
         <article class="product-card${outOfStock ? " out-of-stock" : ""}" data-product-id="${p.id}">
             <div class="product-img-wrap">
-                <img src="${valueOf(p, "image_url", "imageUrl") || ""}" alt="${p.name}">
+                <img src="${esc(valueOf(p, "image_url", "imageUrl") || "")}" alt="${esc(p.name)}">
+                ${state.user ? `<button class="wishlist-btn" data-product-id="${p.id}" onclick="toggleWishlist(${p.id}, event)">🤍</button>` : ""}
                 ${outOfStock ? `<div class="oos-overlay"><span>Hết hàng</span></div>` : ""}
                 ${sale && !outOfStock ? `<span class="sale-badge">-${sale}%</span>` : ""}
             </div>
             <div class="product-body">
-                <span class="badge">${valueOf(p, "category_name", "categoryName") || "Sản phẩm"}</span>
-                <h3>${p.name}</h3>
+                <span class="badge">${esc(valueOf(p, "category_name", "categoryName") || "Sản phẩm")}</span>
+                <h3>${esc(p.name)}</h3>
                 <div class="rating-row">
                     ${ratingStars(rating)}
                     <span class="muted">(${reviewCount})</span>
@@ -102,7 +157,9 @@ function productCard(p) {
                 </div>
                 <div class="card-actions">
                     <button onclick="openProduct(${p.id})">Chi tiết</button>
-                    <button class="primary${outOfStock ? " disabled-btn" : ""}" ${outOfStock ? "disabled" : `onclick="addCart(${p.id})"`}>
+                    <button class="primary${outOfStock ? " disabled-btn" : ""}"
+                        data-cart-btn="${p.id}"
+                        ${outOfStock ? "disabled" : `onclick="addCart(${p.id})"`}>
                         ${outOfStock ? "Hết hàng" : "Thêm vào giỏ"}
                     </button>
                 </div>
@@ -123,7 +180,11 @@ function ratingStars(rating) {
 }
 
 async function openProduct(id) {
-    const [p, reviews] = await Promise.all([api(`/api/products/${id}`), api(`/api/products/${id}/reviews`)]);
+    const [p, reviews, history] = await Promise.all([
+        api(`/api/products/${id}`),
+        api(`/api/products/${id}/reviews`),
+        api(`/api/products/${id}/price-history`).catch(() => [])
+    ]);
     const sale = Number(valueOf(p, "discount_percent", "discountPercent") || 0);
     const finalPrice = Number(p.price) * (100 - sale) / 100;
     const outOfStock = Number(p.stock) === 0;
@@ -133,17 +194,46 @@ async function openProduct(id) {
     // Kiểm tra user đã mua sản phẩm này chưa (để hiện form đánh giá)
     const userReview = state.user ? reviews.find(r => r.username === state.user.username) : null;
 
+    let historyHtml = "";
+    if (history && history.length > 0) {
+        historyHtml = `
+            <div class="price-history-wrap">
+                <h4 class="price-history-title">📈 Lịch sử thay đổi giá</h4>
+                <div class="price-history-list">
+                    ${history.map(h => {
+                        const oldP = Number(h.old_price || h.oldPrice || 0);
+                        const newP = Number(h.new_price || h.newPrice || 0);
+                        const drop = newP < oldP;
+                        const label = drop ? "Giảm giá" : "Tăng giá";
+                        const cls = drop ? "price-history-price-drop" : "price-history-price-up";
+                        return `
+                            <div class="price-history-item">
+                                <div>
+                                    <span class="price-history-time">${formatDate(valueOf(h, "changed_at", "changedAt"))}</span>
+                                    <span style="margin-left: 8px; font-weight: 600;">${label}</span>
+                                </div>
+                                <div>
+                                    <span class="muted">${money(oldP)}</span> → 
+                                    <strong class="${cls}">${money(newP)}</strong>
+                                </div>
+                            </div>`;
+                    }).join("")}
+                </div>
+            </div>`;
+    }
+
     $("#productDetail").innerHTML = `
         <div class="split detail-layout">
             <div class="detail-img-wrap${outOfStock ? " out-of-stock" : ""}">
-                <img class="detail-image" src="${valueOf(p, "image_url", "imageUrl")}" alt="${p.name}">
+                <img class="detail-image" src="${esc(valueOf(p, "image_url", "imageUrl"))}" alt="${esc(p.name)}">
+                ${state.user ? `<button class="wishlist-btn" data-product-id="${p.id}" onclick="toggleWishlist(${p.id}, event)">🤍</button>` : ""}
                 ${outOfStock ? `<div class="oos-overlay large"><span>Hết hàng</span></div>` : ""}
                 ${sale && !outOfStock ? `<span class="sale-badge large">-${sale}%</span>` : ""}
             </div>
             <div class="panel form">
-                <span class="badge">${valueOf(p, "category_name", "categoryName") || "Sản phẩm"}</span>
-                <h2>${p.name}</h2>
-                <p class="muted">${p.description || ""}</p>
+                <span class="badge">${esc(valueOf(p, "category_name", "categoryName") || "Sản phẩm")}</span>
+                <h2>${esc(p.name)}</h2>
+                <p class="muted">${esc(p.description || "")}</p>
                 <div class="detail-rating">
                     ${ratingStars(rating)}
                     <span class="muted">${rating > 0 ? rating.toFixed(1) : "Chưa có"} · ${reviewCount} đánh giá</span>
@@ -154,7 +244,8 @@ async function openProduct(id) {
                 </div>
                 ${outOfStock
                     ? `<div class="oos-notice">Sản phẩm tạm hết hàng</div>`
-                    : `<button class="primary add-to-cart-btn" onclick="addCart(${p.id})">🛒 Thêm vào giỏ hàng</button>`}
+                    : `<button class="primary add-to-cart-btn" data-cart-btn="${p.id}" onclick="addCart(${p.id})">🛒 Thêm vào giỏ hàng</button>`}
+                ${historyHtml}
             </div>
         </div>
         <div class="panel reviews">
@@ -165,11 +256,11 @@ async function openProduct(id) {
             <div class="review-form-wrap" id="reviewFormWrap">
                 <h4>${userReview ? "Sửa đánh giá của bạn" : "Viết đánh giá"}</h4>
                 <div class="star-picker" id="starPicker" data-rating="${userReview ? userReview.rating : 0}">
-                    ${[1,2,3,4,5].map(i => `<span class="pick-star${userReview && i <= userReview.rating ? " selected" : ""}" 
+                    ${[1,2,3,4,5].map(i => `<span class="pick-star${userReview && i <= userReview.rating ? " selected" : ""}"
                         onclick="pickStar(${i})" onmouseover="hoverStar(${i})" onmouseout="unhoverStar()">★</span>`).join("")}
                     <span class="star-hint" id="starHint">${userReview ? `${userReview.rating}/5 sao` : "Chọn số sao"}</span>
                 </div>
-                <textarea id="reviewComment" placeholder="Nhận xét của bạn (không bắt buộc)..." rows="3">${userReview ? (userReview.comment || "") : ""}</textarea>
+                <textarea id="reviewComment" placeholder="Nhận xét của bạn (không bắt buộc)..." rows="3">${esc(userReview ? (userReview.comment || "") : "")}</textarea>
                 <button class="primary" onclick="submitReview(${p.id})">
                     ${userReview ? "Cập nhật đánh giá" : "Gửi đánh giá"}
                 </button>
@@ -180,6 +271,7 @@ async function openProduct(id) {
             </div>
         </div>`;
     show("detail");
+    updateWishlistButtons().catch(() => {});
     // Lưu productId vào form để submit
     if (state.user) {
         const picker = document.getElementById("starPicker");
@@ -191,14 +283,14 @@ function reviewCard(r) {
     return `
         <div class="review-item">
             <div class="review-header">
-                <img class="review-avatar" src="https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(r.username)}" alt="${r.username}">
+                <img class="review-avatar" src="https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(r.username)}" alt="${esc(r.username)}">
                 <div>
-                    <strong>${r.username}</strong>
+                    <strong>${esc(r.username)}</strong>
                     <div>${ratingStars(r.rating)}</div>
                 </div>
                 <span class="muted review-date">${formatDate(valueOf(r, "created_at", "createdAt"))}</span>
             </div>
-            ${r.comment ? `<p class="review-comment">${r.comment}</p>` : ""}
+            ${r.comment ? `<p class="review-comment">${esc(r.comment)}</p>` : ""}
         </div>`;
 }
 
@@ -251,20 +343,57 @@ async function uploadFile(file) {
 
 async function addCart(productId) {
     requireLogin();
-    await api("/api/cart/add", { method: "POST", body: JSON.stringify({ productId, quantity: 1 }) });
-    toast("Đã thêm vào giỏ hàng");
+    const btn = document.querySelector(`[data-cart-btn="${productId}"]`);
+    const originalHtml = btn ? btn.innerHTML : "";
+    if (btn) { btn.disabled = true; btn.innerHTML = "Đang thêm..."; }
+    try {
+        await api("/api/cart/add", { method: "POST", body: JSON.stringify({ productId, quantity: 1 }) });
+        toast("Đã thêm vào giỏ hàng");
+        updateCartBadge();
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+    }
+}
+
+function drawCartBadge(cart) {
+    const count = (cart.items || []).reduce((s, i) => s + Number(i.quantity||0), 0);
+    let badge = document.getElementById("cartBadge");
+    if (!badge) {
+        const cartBtn = document.querySelector('[data-view="cart"]');
+        if (cartBtn) {
+            badge = document.createElement("span");
+            badge.id = "cartBadge";
+            badge.className = "cart-badge";
+            cartBtn.appendChild(badge);
+        }
+    }
+    if (badge) { badge.textContent = count; badge.style.display = count > 0 ? "inline-flex" : "none"; }
+}
+
+async function updateCartBadge() {
+    if (!state.user) { const b = document.getElementById("cartBadge"); if(b) b.style.display="none"; return; }
+    try {
+        const cart = await api("/api/cart");
+        drawCartBadge(cart);
+    } catch (_) {}
 }
 
 async function loadCart() {
     requireLogin();
-    const cart = await api("/api/cart");
+    const [cart, myVouchers] = await Promise.all([
+        api("/api/cart"),
+        state.user ? api("/api/auth/vouchers/my").catch(() => []) : Promise.resolve([])
+    ]);
+    drawCartBadge(cart);
+    const subtotal = Number(cart.subtotal) || 0;
+
     $("#cartItems").innerHTML = `
         <h3>Sản phẩm trong giỏ</h3>
         ${cart.items.map(item => `
             <div class="cart-row">
-                <img src="${item.imageUrl}" alt="${item.name}">
+                <img src="${esc(item.imageUrl)}" alt="${esc(item.name)}">
                 <div>
-                    <strong>${item.name}</strong>
+                    <strong>${esc(item.name)}</strong>
                     <div class="muted">${money(item.salePrice)} · SL: ${item.quantity}</div>
                     <div class="price">${money(item.lineTotal)}</div>
                 </div>
@@ -274,7 +403,122 @@ async function loadCart() {
                     <button onclick="removeCart(${item.productId})">Xóa</button>
                 </div>
             </div>`).join("") || `<p class="muted">Giỏ hàng đang trống.</p>`}
-        <h3>Tạm tính: ${money(cart.subtotal)}</h3>`;
+        <div id="cartSummary" class="cart-summary">
+            <div class="summary-row"><span>Tạm tính</span><span id="cartSubtotal">${money(subtotal)}</span></div>
+            <div class="summary-row" id="cartDiscountRow" style="display:none">
+                <span>Giảm (<span id="cartCouponCode"></span>)</span>
+                <span id="cartDiscount" style="color:#16a34a;font-weight:700"></span>
+            </div>
+            <div class="summary-row cart-total"><strong>Tổng thanh toán</strong><strong id="cartTotal">${money(subtotal)}</strong></div>
+        </div>`;
+
+    // Lọc voucher còn hiệu lực
+    const today = new Date();
+    const validVouchers = myVouchers.filter(v => {
+        const end = v.end_date ? new Date(v.end_date) : null;
+        return v.active && (!end || today <= end);
+    });
+
+    const btn  = document.getElementById("voucherPickerBtn");
+    const list = document.getElementById("voucherPickerList");
+    const hiddenInput = document.getElementById("couponCodeHidden");
+    if (!btn || !list || !hiddenInput) return;
+
+    // Render danh sách voucher
+    if (!validVouchers.length) {
+        list.innerHTML = `<div class="vp-empty">Bạn chưa có mã giảm giá nào.<br><a href="#" onclick="show('vouchers');return false">Thu thập ngay →</a></div>`;
+    } else {
+        list.innerHTML = validVouchers.map(v => {
+            const save = Math.round(subtotal * v.discount_percent / 100);
+            return `<div class="vp-item" data-code="${v.code}" onclick="applyVoucher('${v.code}', ${subtotal})">
+                <div class="vp-item-left">
+                    <span class="vp-pct">-${v.discount_percent}%</span>
+                </div>
+                <div class="vp-item-mid">
+                    <strong class="vp-code">${v.code}</strong>
+                    <span class="vp-save">Tiết kiệm ${money(save)}</span>
+                </div>
+                <span class="vp-check" id="vp-check-${v.code}" style="display:none">✓</span>
+            </div>`;
+        }).join("") +
+        `<div class="vp-remove" onclick="applyVoucher('', ${subtotal})">✕ Bỏ mã giảm giá</div>`;
+    }
+
+    // Toggle list
+    btn.onclick = () => {
+        const open = list.style.display !== "none";
+        list.style.display = open ? "none" : "block";
+        btn.classList.toggle("vp-open", !open);
+    };
+
+    // Nếu đã có mã từ trước (copyAndUse), preview lại
+    if (hiddenInput.value) {
+        applyVoucher(hiddenInput.value, subtotal);
+    }
+}
+
+function applyVoucher(code, subtotal) {
+    // Lấy subtotal thực từ DOM nếu có (tránh stale closure)
+    const subtotalEl = document.getElementById("cartSubtotal");
+    if (subtotalEl) {
+        const parsed = Number(subtotalEl.textContent.replace(/[^\d]/g, ""));
+        if (parsed > 0) subtotal = parsed;
+    }
+    const hiddenInput = document.getElementById("couponCodeHidden");
+    const label       = document.getElementById("voucherPickerLabel");
+    const list        = document.getElementById("voucherPickerList");
+    const btn         = document.getElementById("voucherPickerBtn");
+
+    // Reset check marks
+    document.querySelectorAll(".vp-check").forEach(el => el.style.display = "none");
+
+    if (!code) {
+        if (hiddenInput) hiddenInput.value = "";
+        if (label) label.innerHTML = "🎫 Chọn mã giảm giá";
+        if (list)  list.style.display = "none";
+        if (btn)   btn.classList.remove("vp-open", "vp-applied");
+        resetCouponPreview(subtotal);
+        return;
+    }
+
+    if (hiddenInput) hiddenInput.value = code;
+    if (label) label.innerHTML = `🎫 <strong>${code}</strong>`;
+    if (list)  list.style.display = "none";
+    if (btn)   { btn.classList.remove("vp-open"); btn.classList.add("vp-applied"); }
+
+    const checkEl = document.getElementById(`vp-check-${code}`);
+    if (checkEl) checkEl.style.display = "";
+
+    previewCoupon(code, subtotal);
+}
+
+
+
+
+async function previewCoupon(code, subtotal) {
+    try {
+        const result = await api(`/api/cart/apply-coupon?code=${encodeURIComponent(code)}`);
+        const discount = Number(result.discount) || 0;
+        const total    = Number(result.total)    || subtotal;
+        const row = document.getElementById("cartDiscountRow");
+        if (row) row.style.display = "";
+        const codeEl = document.getElementById("cartCouponCode");
+        if (codeEl) codeEl.textContent = code;
+        const discEl = document.getElementById("cartDiscount");
+        if (discEl) discEl.textContent = "-" + money(discount);
+        const totalEl = document.getElementById("cartTotal");
+        if (totalEl) { totalEl.textContent = money(total); totalEl.style.color = "var(--primary-dark)"; }
+    } catch (err) {
+        resetCouponPreview(subtotal);
+        toast(err.message || "Mã giảm giá không hợp lệ");
+    }
+}
+
+function resetCouponPreview(subtotal) {
+    const row = document.getElementById("cartDiscountRow");
+    if (row) row.style.display = "none";
+    const total = document.getElementById("cartTotal");
+    if (total) { total.textContent = money(subtotal); total.style.color = ""; }
 }
 
 async function changeQty(productId, quantity) {
@@ -356,6 +600,7 @@ async function openOrder(id) {
                 </div>
                 <div style="display:flex;align-items:center;gap:10px;">
                     <span class="badge status-${status.toLowerCase()}">${statusLabel[status] || status}</span>
+                    ${status === "PENDING" ? `<button onclick="cancelMyOrder(${order.id})" style="background:#fef2f2;border-color:#fecaca;color:#b42318;min-height:auto;padding:6px 14px;font-size:13px">Hủy đơn</button>` : ""}
                     <button onclick="closeOrderDetail()" class="close-btn">✕</button>
                 </div>
             </div>
@@ -371,20 +616,20 @@ async function openOrder(id) {
                 </div>`}
             <div class="order-meta">
                 <div><span class="meta-label">Ngày đặt</span><span>${formatDate(valueOf(order, "created_at", "createdAt"))}</span></div>
-                <div><span class="meta-label">Người nhận</span><span>${valueOf(order, "shipping_name", "shippingName") || ""}</span></div>
-                <div><span class="meta-label">Điện thoại</span><span>${valueOf(order, "shipping_phone", "shippingPhone") || ""}</span></div>
-                <div><span class="meta-label">Địa chỉ</span><span>${valueOf(order, "shipping_address", "shippingAddress") || ""}</span></div>
+                <div><span class="meta-label">Người nhận</span><span>${esc(valueOf(order, "shipping_name", "shippingName") || "")}</span></div>
+                <div><span class="meta-label">Điện thoại</span><span>${esc(valueOf(order, "shipping_phone", "shippingPhone") || "")}</span></div>
+                <div><span class="meta-label">Địa chỉ</span><span>${esc(valueOf(order, "shipping_address", "shippingAddress") || "")}</span></div>
             </div>
             <h4 class="items-heading">Sản phẩm đã đặt (${items.length})</h4>
             <div class="order-items">
                 ${items.map(item => `
                     <div class="order-item">
-                        <img src="${item.imageUrl || "https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?w=300"}"
-                             alt="${valueOf(item, "product_name", "productName") || ""}"
+                        <img src="${esc(item.imageUrl || "https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?w=300")}"
+                             alt="${esc(valueOf(item, "product_name", "productName") || "")}"
                              onerror="this.src='https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?w=300'">
                         <div class="order-item-info">
-                            <strong>${valueOf(item, "product_name", "productName")}</strong>
-                            <p class="muted">${item.productDescription || ""}</p>
+                            <strong>${esc(valueOf(item, "product_name", "productName") || "")}</strong>
+                            <p class="muted">${esc(item.productDescription || "")}</p>
                             <span class="muted">Đơn giá: ${money(item.price)} × ${item.quantity}</span>
                         </div>
                         <strong class="order-item-total">${money(Number(item.price) * Number(item.quantity))}</strong>
@@ -403,6 +648,38 @@ function closeOrderDetail() {
     state.selectedOrderId = null;
     $("#orderDetail").classList.add("hidden");
     api("/api/orders").then(renderOrdersList).catch(() => {});
+}
+
+async function cancelMyOrder(orderId) {
+    // Dùng custom modal thay vì confirm() vì nút "Hủy" của Chrome gây nhầm lẫn
+    const confirmed = await new Promise(resolve => {
+        const existing = document.getElementById("cancelConfirmModal");
+        if (existing) existing.remove();
+        const modal = document.createElement("dialog");
+        modal.id = "cancelConfirmModal";
+        modal.style.cssText = "width:min(400px,calc(100vw - 32px));border:1px solid var(--line);border-radius:16px;padding:28px 24px;box-shadow:var(--shadow);text-align:center;";
+        modal.innerHTML = `
+            <div style="font-size:40px;margin-bottom:12px">⚠️</div>
+            <h3 style="margin:0 0 8px;font-size:18px">Hủy đơn hàng #${orderId}?</h3>
+            <p style="color:var(--muted);margin:0 0 20px;font-size:14px">Thao tác này không thể hoàn tác. Đơn hàng sẽ bị hủy vĩnh viễn.</p>
+            <div style="display:flex;gap:10px;justify-content:center">
+                <button id="cancelConfirmNo" style="min-height:auto;padding:8px 20px;font-size:14px;">Quay lại</button>
+                <button id="cancelConfirmYes" class="primary" style="min-height:auto;padding:8px 20px;font-size:14px;background:#dc2626;border-color:#dc2626;">Xác nhận hủy</button>
+            </div>`;
+        document.body.appendChild(modal);
+        modal.showModal();
+        modal.querySelector("#cancelConfirmNo").onclick = () => { modal.close(); modal.remove(); resolve(false); };
+        modal.querySelector("#cancelConfirmYes").onclick = () => { modal.close(); modal.remove(); resolve(true); };
+        modal.addEventListener("close", () => { modal.remove(); resolve(false); });
+    });
+    if (!confirmed) return;
+    try {
+        await api(`/api/orders/${orderId}/cancel`, { method: "DELETE" });
+        toast("Đã hủy đơn hàng #" + orderId + " thành công");
+        await loadOrders();
+    } catch (e) {
+        toast(e.message || "Không thể hủy đơn hàng");
+    }
 }
 
 async function loadOrdersListActiveOnly() {
@@ -439,13 +716,241 @@ async function loadProfile() {
     await loadRankCard();
 }
 
+async function loadUserStats() {
+    requireLogin();
+    const panel = $("#userStatsPanel");
+    panel.innerHTML = `<div style="padding:20px;color:var(--muted)">Đang tải...</div>`;
+    
+    const periodSelect = document.getElementById("userStatsPeriodFilter");
+    const period = periodSelect ? periodSelect.value : "all";
+    
+    try {
+        const stats = await api(`/api/user/spending-stats?period=${period}`);
+        
+        panel.innerHTML = `
+            <div class="stats-dashboard" style="display:flex; flex-direction:column; gap:24px;">
+                <!-- 1. Stats Cards Grid -->
+                <div class="user-stats-cards">
+                    <div class="user-stat-card" style="--accent:#0f766e">
+                        <div class="user-stat-icon">💰</div>
+                        <div class="user-stat-info">
+                            <span class="user-stat-label">Tổng chi tiêu</span>
+                            <strong class="user-stat-value">${money(stats.totalSpent)}</strong>
+                        </div>
+                    </div>
+                    <div class="user-stat-card" style="--accent:#2563eb">
+                        <div class="user-stat-icon">📅</div>
+                        <div class="user-stat-info">
+                            <span class="user-stat-label">Hôm nay</span>
+                            <strong class="user-stat-value">${money(stats.spentToday)}</strong>
+                        </div>
+                    </div>
+                    <div class="user-stat-card" style="--accent:#7c3aed">
+                        <div class="user-stat-icon">📆</div>
+                        <div class="user-stat-info">
+                            <span class="user-stat-label">Tháng này</span>
+                            <strong class="user-stat-value">${money(stats.spentThisMonth)}</strong>
+                        </div>
+                    </div>
+                    <div class="user-stat-card" style="--accent:#d97706">
+                        <div class="user-stat-icon">📊</div>
+                        <div class="user-stat-info">
+                            <span class="user-stat-label">Năm nay</span>
+                            <strong class="user-stat-value">${money(stats.spentThisYear)}</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Spending Chart (daily/period) -->
+                <div class="admin-form-card" style="margin:0;">
+                    <h3>📈 Biểu đồ chi tiêu ${period === "today" ? "hôm nay" : period === "week" ? "tuần này" : period === "month" ? "tháng này" : period === "year" ? "năm nay" : "tất cả"}</h3>
+                    <div style="position:relative; height:300px; width:100%;">
+                        <canvas id="userSpendingChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 3. Category distribution & Top Purchased Products -->
+                <div style="display:grid; grid-template-columns: 1fr 1.5fr; gap:20px;">
+                    <div class="admin-form-card" style="margin:0; display:flex; flex-direction:column;">
+                        <h3>📊 Phân loại chi tiêu</h3>
+                        <div style="position:relative; height:240px; width:100%; margin:auto; display:flex; align-items:center; justify-content:center;">
+                            <canvas id="userCategoryChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="admin-form-card" style="margin:0; display:flex; flex-direction:column;">
+                        <h3>🛍️ Sản phẩm mua nhiều nhất</h3>
+                        <div class="table-wrap" style="flex:1; margin-top:8px;">
+                            <table style="width:100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Ảnh</th>
+                                        <th>Sản phẩm</th>
+                                        <th>Số lượng</th>
+                                        <th>Tổng tiền</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${(stats.topProducts || []).map(p => `
+                                        <tr>
+                                            <td><img src="${esc(p.imageUrl || "")}" style="width:40px; height:40px; object-fit:cover; border-radius:6px; background:#e5e7eb"></td>
+                                            <td><strong>${esc(p.name)}</strong></td>
+                                            <td style="font-weight:600;">${p.quantity}</td>
+                                            <td style="font-weight:600; color:var(--primary-dark);">${money(p.totalSpent)}</td>
+                                        </tr>
+                                    `).join("") || '<tr><td colspan="4" style="text-align:center; color:var(--muted)">Bạn chưa mua sản phẩm nào</td></tr>'}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Recent Orders History -->
+                <div class="admin-form-card" style="margin:0;">
+                    <h3>🧾 Lịch sử đơn hàng gần đây <span style="font-weight:400;color:var(--muted);font-size:14px;">(${stats.totalOrders || 0} đơn)</span></h3>
+                    <div class="table-wrap" style="margin-top:8px; max-height:500px; overflow-y:auto;">
+                        <table style="width:100%;">
+                            <thead style="position:sticky;top:0;background:var(--surface);z-index:1;">
+                                <tr>
+                                    <th>Mã đơn</th>
+                                    <th>Sản phẩm</th>
+                                    <th>Tổng tiền</th>
+                                    <th>Trạng thái</th>
+                                    <th>Ngày đặt</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${(stats.recentOrders || []).map(o => {
+                                    const statusMap = { PENDING:"Chờ xử lý", CONFIRMED:"Đã xác nhận", SHIPPING:"Đang giao", DELIVERED:"Thành công", CANCELLED:"Đã hủy" };
+                                    const colorMap = { PENDING:"#f59e0b", CONFIRMED:"#3b82f6", SHIPPING:"#8b5cf6", DELIVERED:"#10b981", CANCELLED:"#ef4444" };
+                                    const itemsSummary = (o.items || []).map(i => `${esc(i.name)} x${i.quantity}`).join(", ");
+                                    return `<tr>
+                                        <td><strong>#${o.id}</strong></td>
+                                        <td style="max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;" title="${esc(itemsSummary)}">${esc(itemsSummary) || "—"}</td>
+                                        <td style="font-weight:600;color:var(--primary-dark);">${money(o.totalAmount)}</td>
+                                        <td><span style="background:${colorMap[o.status] || "#6b7280"}22;color:${colorMap[o.status] || "#6b7280"};padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap;">${statusMap[o.status] || o.status}</span></td>
+                                        <td style="font-size:13px;color:var(--muted);white-space:nowrap;">${formatDate(o.createdAt)}</td>
+                                    </tr>`;
+                                }).join("") || '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">Chưa có đơn hàng nào trong khoảng thời gian này</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <style>
+                @media (max-width: 860px) {
+                    .stats-dashboard > div[style*="grid-template-columns"] {
+                        grid-template-columns: 1fr !important;
+                    }
+                }
+            </style>
+        `;
+
+        setTimeout(() => {
+            // Draw Spending Chart (daily/period based)
+            const spendCtx = document.getElementById("userSpendingChart")?.getContext("2d");
+            if (spendCtx) {
+                const chartData = stats.dailySpending || [];
+                const labels = chartData.map(d => d.label);
+                const values = chartData.map(d => d.value);
+
+                const gradient = spendCtx.createLinearGradient(0, 0, 0, 280);
+                gradient.addColorStop(0, "rgba(15, 118, 110, 0.35)");
+                gradient.addColorStop(1, "rgba(15, 118, 110, 0.0)");
+
+                new Chart(spendCtx, {
+                    type: "line",
+                    data: {
+                        labels,
+                        datasets: [{
+                            label: "Chi tiêu (VNĐ)",
+                            data: values,
+                            borderColor: "#0f766e",
+                            borderWidth: 3,
+                            backgroundColor: gradient,
+                            fill: true,
+                            tension: 0.35,
+                            pointBackgroundColor: "#0f766e",
+                            pointHoverRadius: 7
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: { color: "rgba(0,0,0,0.05)" },
+                                ticks: { callback: val => new Intl.NumberFormat("vi-VN").format(val) + " đ" }
+                            },
+                            x: { grid: { display: false } }
+                        }
+                    }
+                });
+            }
+
+            // Draw Category Doughnut Chart
+            const catCtx = document.getElementById("userCategoryChart")?.getContext("2d");
+            if (catCtx) {
+                const labels = (stats.categorySpending || []).map(d => d.label);
+                const values = (stats.categorySpending || []).map(d => d.value);
+
+                new Chart(catCtx, {
+                    type: "doughnut",
+                    data: {
+                        labels,
+                        datasets: [{
+                            data: values,
+                            backgroundColor: ["#0f766e", "#3b82f6", "#8b5cf6", "#f59e0b", "#ec4899", "#10b981", "#6b7280"]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: "bottom",
+                                labels: { boxWidth: 12, font: { size: 12 } }
+                            }
+                        }
+                    }
+                });
+            }
+        }, 50);
+
+    } catch (err) {
+        panel.innerHTML = `
+            <div style="margin:24px;padding:20px;background:#fef2f2;border:1px solid #fecaca;border-radius:12px;color:#b42318">
+                <strong>Lỗi tải thống kê chi tiêu:</strong> ${err.message}
+            </div>`;
+    }
+}
+
 async function loadAdmin() {
     requireAdmin();
-    const dashboard = await api("/api/admin/dashboard");
+    const period = state.adminPeriod || "all";
+    let dashboard;
+    try {
+        dashboard = await api(`/api/admin/dashboard?period=${period}`);
+    } catch (err) {
+        $("#adminStats").innerHTML = "";
+        $("#adminPanel").innerHTML = `
+            <div style="margin:24px;padding:20px;background:#fef2f2;border:1px solid #fecaca;border-radius:12px;color:#b42318">
+                <strong>Lỗi tải dashboard:</strong> ${err.message}
+            </div>`;
+        return;
+    }
 
-    const tabTitles = { products: "Sản phẩm", categories: "Danh mục", coupons: "Coupon", orders: "Đơn hàng", users: "Người dùng", stock: "Tồn kho thấp" };
+    const tabTitles = { dashboard: "Thống kê", products: "Sản phẩm", categories: "Danh mục", coupons: "Coupon", orders: "Đơn hàng", users: "Người dùng", stock: "Tồn kho thấp", reports: "Báo cáo doanh thu" };
     const titleEl = document.getElementById("adminTabTitle");
     if (titleEl) titleEl.textContent = tabTitles[state.adminTab] || "Dashboard";
+
+    const filterWrapper = document.getElementById("adminPeriodFilterWrapper");
+    if (filterWrapper) {
+        filterWrapper.style.display = (state.adminTab === "dashboard" || state.adminTab === "reports") ? "block" : "none";
+        const selectEl = document.getElementById("adminPeriodFilter");
+        if (selectEl) selectEl.value = period;
+    }
 
     $("#adminStats").innerHTML = [
         ["📦", "Sản phẩm", dashboard.products, "#0f766e"],
@@ -461,15 +966,297 @@ async function loadAdmin() {
             </div>
         </div>`).join("");
 
-    await renderAdminTab(dashboard);
+    try {
+        await renderAdminTab(dashboard);
+    } catch (err) {
+        $("#adminPanel").innerHTML = `
+            <div style="margin:0 0 16px;padding:20px;background:#fef2f2;border:1px solid #fecaca;border-radius:12px;color:#b42318">
+                <strong>Lỗi tải tab "${state.adminTab}":</strong> ${err.message}
+            </div>`;
+    }
 }
+
+const ADMIN_PAGE_SIZE = 10;
+
+function paginationControls(total, page, onPageChange) {
+    const totalPages = Math.ceil(total / ADMIN_PAGE_SIZE);
+    if (totalPages <= 1) return "";
+    return `
+        <div class="pagination-wrap" style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:12px 16px;background:#f8fafc;border-radius:12px;border:1px solid var(--line);">
+            <button onclick="${onPageChange}(${page - 1})" ${page <= 1 ? "disabled" : ""} style="min-height:auto;padding:6px 12px;font-size:13px;">◀ Trước</button>
+            <span style="font-size:13.5px;color:var(--muted);font-weight:600;">Trang ${page} / ${totalPages}</span>
+            <button onclick="${onPageChange}(${page + 1})" ${page >= totalPages ? "disabled" : ""} style="min-height:auto;padding:6px 12px;font-size:13px;">Sau ▶</button>
+        </div>`;
+}
+
+window.changeAdminPage = async function(newPage) {
+    state.adminPage = newPage;
+    await loadAdmin();
+};
+
+window.updateStock = async function(id) {
+    const input = document.getElementById(`stock-input-${id}`);
+    if (!input) return;
+    const newStock = parseInt(input.value);
+    if (isNaN(newStock) || newStock < 0) {
+        toast("Số lượng tồn kho không hợp lệ");
+        return;
+    }
+    try {
+        const p = await api(`/api/products/${id}`);
+        await api(`/api/admin/products/${id}`, {
+            method: "PUT",
+            body: JSON.stringify({
+                name: p.name,
+                description: p.description,
+                price: Number(p.price),
+                stock: newStock,
+                imageUrl: valueOf(p, "image_url", "imageUrl") || "",
+                categoryId: Number(valueOf(p, "category_id", "categoryId")),
+                featured: valueOf(p, "featured") === true || valueOf(p, "featured") === 1 || valueOf(p, "featured") === "true",
+                discountPercent: Number(valueOf(p, "discount_percent", "discountPercent") || 0)
+            })
+        });
+        toast("Đã cập nhật tồn kho thành công");
+        await loadAdmin();
+    } catch (err) {
+        toast(err.message);
+    }
+};
 
 async function renderAdminTab(dashboard) {
     const panel = $("#adminPanel");
     panel.innerHTML = `<div style="padding:20px;color:var(--muted)">Đang tải...</div>`;
 
+    if (state.adminTab === "dashboard") {
+        panel.innerHTML = `
+            <div class="dashboard-wrapper" style="display:flex; flex-direction:column; gap:20px;">
+                <!-- Section 1: Revenue Chart -->
+                <div class="admin-form-card" style="margin:0;">
+                    <h3>📈 Biểu đồ doanh thu</h3>
+                    <div style="position:relative; height:320px; width:100%;">
+                        <canvas id="revenueChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Section 2: Category Share & Top Selling Products -->
+                <div style="display:grid; grid-template-columns: 1fr 1.5fr; gap:20px;">
+                    <div class="admin-form-card" style="margin:0; display:flex; flex-direction:column;">
+                        <h3>📊 Doanh thu theo danh mục</h3>
+                        <div style="position:relative; height:240px; width:100%; margin:auto; display:flex; align-items:center; justify-content:center;">
+                            <canvas id="categoryChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="admin-form-card" style="margin:0; display:flex; flex-direction:column;">
+                        <h3>🏆 Top sản phẩm bán chạy</h3>
+                        <div class="table-wrap" style="flex:1; margin-top:8px;">
+                            <table style="width:100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Ảnh</th>
+                                        <th>Sản phẩm</th>
+                                        <th>Đã bán</th>
+                                        <th>Doanh thu</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${(dashboard.topProducts || []).map(p => `
+                                        <tr>
+                                            <td><img src="${esc(p.imageUrl || "")}" style="width:40px; height:40px; object-fit:cover; border-radius:6px; background:#e5e7eb"></td>
+                                            <td><strong>${esc(p.name)}</strong></td>
+                                            <td style="font-weight:600;">${p.quantitySold}</td>
+                                            <td style="font-weight:600; color:var(--primary-dark);">${money(p.revenue)}</td>
+                                        </tr>
+                                    `).join("") || '<tr><td colspan="4" style="text-align:center; color:var(--muted)">Chưa có dữ liệu</td></tr>'}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: Order Status & Low Stock alerts -->
+                <div style="display:grid; grid-template-columns: 1fr 1.5fr; gap:20px;">
+                    <div class="admin-form-card" style="margin:0; display:flex; flex-direction:column;">
+                        <h3>📝 Trạng thái đơn hàng</h3>
+                        <div style="position:relative; height:240px; width:100%; margin:auto; display:flex; align-items:center; justify-content:center;">
+                            <canvas id="orderStatusChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="admin-form-card" style="margin:0; display:flex; flex-direction:column;">
+                        <h3>⚠️ Cảnh báo tồn kho thấp</h3>
+                        <div class="table-wrap" style="flex:1; margin-top:8px;">
+                            <table style="width:100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Mã</th>
+                                        <th>Sản phẩm</th>
+                                        <th>Còn lại</th>
+                                        <th>Hành động</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${(dashboard.lowStock || []).slice(0, 5).map(p => `
+                                        <tr>
+                                            <td>${p.id}</td>
+                                            <td>
+                                                <a href="#" onclick="event.preventDefault(); state.adminTab='stock'; loadAdmin(); document.querySelectorAll('[data-admin-tab]').forEach(b=>b.classList.toggle('active', b.dataset.adminTab==='stock'));" style="color:var(--primary); font-weight:700; text-decoration:none;">
+                                                    ${esc(p.name)}
+                                                </a>
+                                            </td>
+                                            <td style="color:#b42318; font-weight:700;">${p.stock}</td>
+                                            <td>
+                                                <button onclick="event.preventDefault(); state.adminTab='products'; loadAdmin().then(()=>openEditProduct(${p.id})); document.querySelectorAll('[data-admin-tab]').forEach(b=>b.classList.toggle('active', b.dataset.adminTab==='products'));" style="padding:4px 8px; font-size:12px; background:#f0fdf4; border-color:#bbf7d0; color:#16a34a; font-weight:600;">Nhập hàng</button>
+                                            </td>
+                                        </tr>
+                                    `).join("") || '<tr><td colspan="4" style="text-align:center; color:#15803d; font-weight:600;">Tất cả sản phẩm đều đủ tồn kho! 🎉</td></tr>'}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <style>
+                @media (max-width: 860px) {
+                    .dashboard-wrapper > div {
+                        grid-template-columns: 1fr !important;
+                    }
+                }
+            </style>
+        `;
+
+        setTimeout(() => {
+            // 1. Revenue Chart
+            const revCtx = document.getElementById("revenueChart")?.getContext("2d");
+            if (revCtx) {
+                const labels = (dashboard.revenueChartData || []).map(d => d.label);
+                const values = (dashboard.revenueChartData || []).map(d => d.value);
+                
+                // Create gradient
+                const gradient = revCtx.createLinearGradient(0, 0, 0, 300);
+                gradient.addColorStop(0, "rgba(15, 118, 110, 0.3)");
+                gradient.addColorStop(1, "rgba(15, 118, 110, 0.0)");
+                
+                new Chart(revCtx, {
+                    type: "line",
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: "Doanh thu (VNĐ)",
+                            data: values,
+                            borderColor: "#0f766e",
+                            borderWidth: 3,
+                            backgroundColor: gradient,
+                            fill: true,
+                            tension: 0.35,
+                            pointBackgroundColor: "#0f766e",
+                            pointHoverRadius: 7
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: { color: "rgba(0, 0, 0, 0.05)" },
+                                ticks: {
+                                    callback: (val) => new Intl.NumberFormat("vi-VN").format(val) + " đ"
+                                }
+                            },
+                            x: {
+                                grid: { display: false }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // 2. Category Revenue Chart
+            const catCtx = document.getElementById("categoryChart")?.getContext("2d");
+            if (catCtx) {
+                const labels = (dashboard.categoryRevenue || []).map(d => d.label);
+                const values = (dashboard.categoryRevenue || []).map(d => d.value);
+                
+                new Chart(catCtx, {
+                    type: "doughnut",
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: values,
+                            backgroundColor: ["#0f766e", "#3b82f6", "#8b5cf6", "#f59e0b", "#ec4899", "#10b981", "#6b7280"]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: "bottom",
+                                labels: { boxWidth: 12, font: { size: 12 } }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // 3. Order Status Chart
+            const statusCtx = document.getElementById("orderStatusChart")?.getContext("2d");
+            if (statusCtx) {
+                const statusMap = {
+                    PENDING: "Chờ xử lý",
+                    CONFIRMED: "Đã xác nhận",
+                    SHIPPING: "Đang giao",
+                    DELIVERED: "Thành công",
+                    CANCELLED: "Đã hủy"
+                };
+                const colorsMap = {
+                    PENDING: "#f59e0b",
+                    CONFIRMED: "#3b82f6",
+                    SHIPPING: "#8b5cf6",
+                    DELIVERED: "#10b981",
+                    CANCELLED: "#ef4444"
+                };
+                
+                const labels = (dashboard.orderStatusCounts || []).map(d => statusMap[d.label] || d.label);
+                const colors = (dashboard.orderStatusCounts || []).map(d => colorsMap[d.label] || "#6b7280");
+                const values = (dashboard.orderStatusCounts || []).map(d => d.value);
+                
+                new Chart(statusCtx, {
+                    type: "doughnut",
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: values,
+                            backgroundColor: colors
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: "bottom",
+                                labels: { boxWidth: 12, font: { size: 12 } }
+                            }
+                        }
+                    }
+                });
+            }
+        }, 50);
+        return;
+    }
+
     if (state.adminTab === "products") {
         const products = await api("/api/products");
+        const total = products.length;
+        const page = state.adminPage || 1;
+        const start = (page - 1) * ADMIN_PAGE_SIZE;
+        const end = start + ADMIN_PAGE_SIZE;
+        const paginatedProducts = products.slice(start, end);
+
         panel.innerHTML = `
             <div class="admin-form-card">
                 <h3>➕ Thêm sản phẩm mới</h3>
@@ -477,19 +1264,20 @@ async function renderAdminTab(dashboard) {
             </div>` +
             table(
                 ["Ảnh", "Tên", "Giá", "Kho", "Danh mục", "Nổi bật", "Thao tác"],
-                products.map(p => [
-                    `<img src="${valueOf(p,"image_url","imageUrl")||""}" style="width:52px;height:44px;object-fit:cover;border-radius:6px;background:#e5e7eb">`,
-                    `<strong>${p.name}</strong>`,
+                paginatedProducts.map(p => [
+                    `<img src="${esc(valueOf(p,"image_url","imageUrl")||"")}" style="width:52px;height:44px;object-fit:cover;border-radius:6px;background:#e5e7eb">`,
+                    `<strong>${esc(p.name)}</strong>`,
                     money(p.price),
                     p.stock,
-                    valueOf(p, "category_name", "categoryName") || "—",
+                    esc(valueOf(p, "category_name", "categoryName") || "—"),
                     valueOf(p, "featured") ? `<span style="color:#16a34a;font-weight:700">✓</span>` : `<span style="color:#d1d5db">—</span>`,
                     `<div style="display:flex;gap:6px">
                         <button onclick="openEditProduct(${p.id})" style="background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8">Sửa</button>
                         <button onclick="deleteAdmin('/api/admin/products/${p.id}')" style="background:#fef2f2;border-color:#fecaca;color:#b42318">Xóa</button>
                     </div>`
                 ])
-            );
+            ) +
+            paginationControls(total, page, "changeAdminPage");
         document.getElementById("productForm").onsubmit = submitProduct;
     }
     if (state.adminTab === "categories") {
@@ -504,8 +1292,8 @@ async function renderAdminTab(dashboard) {
                 </form>
             </div>
             ${table(["Tên", "Mô tả", "Thao tác"], cats.map(c => [
-                `<strong>${c.name}</strong>`,
-                c.description || `<span class="muted">—</span>`,
+                `<strong>${esc(c.name)}</strong>`,
+                esc(c.description) || `<span class="muted">—</span>`,
                 `<div style="display:flex;gap:6px">
                     <button onclick="openEditCategory(${c.id},'${encodeURIComponent(c.name)}','${encodeURIComponent(c.description||'')}' )" style="background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8">Sửa</button>
                     <button onclick="deleteAdmin('/api/admin/categories/${c.id}')" style="background:#fef2f2;border-color:#fecaca;color:#b42318">Xóa</button>
@@ -522,29 +1310,48 @@ async function renderAdminTab(dashboard) {
                 <form id="couponForm" class="admin-form" style="margin:0;border:none;box-shadow:none;padding:0;background:transparent">
                     <input name="code" placeholder="Mã code (VD: SALE20)" required>
                     <input name="discountPercent" type="number" min="1" max="100" placeholder="% giảm" required>
+                    <input name="maxUses" type="number" min="1" placeholder="Số lượt dùng (để trống = không giới hạn)">
                     <label style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3px">Ngày bắt đầu<input name="startDate" type="date" style="margin:0"></label>
                     <label style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3px">Ngày kết thúc<input name="endDate" type="date" style="margin:0"></label>
                     <button class="primary">Thêm</button>
                 </form>
             </div>
-            ${table(["Code", "% Giảm", "Trạng thái", "Từ ngày", "Đến ngày", "Thao tác"], coupons.map(c => [
-                `<strong style="font-family:monospace;font-size:14px">${c.code}</strong>`,
-                `<span style="font-weight:800;color:var(--primary-dark)">${c.discount_percent}%</span>`,
-                c.active
-                    ? `<span class="badge" style="background:#ecfdf3;color:#027a48">✓ Đang bật</span>`
-                    : `<span class="badge" style="background:#f3f4f6;color:#6b7280">✗ Tắt</span>`,
-                fmtDate(c.start_date),
-                fmtDate(c.end_date),
-                `<div style="display:flex;gap:6px;flex-wrap:wrap">
-                    <button onclick="openEditCoupon(${c.id})" style="background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8">Sửa</button>
-                    <button onclick="toggleCoupon(${c.id},${c.active})" style="background:${c.active?'#fff7ed':'#ecfdf3'};border-color:${c.active?'#fed7aa':'#bbf7d0'};color:${c.active?'#b45309':'#027a48'}">${c.active ? 'Tắt' : 'Bật'}</button>
-                    <button onclick="deleteAdmin('/api/admin/coupons/${c.id}')" style="background:#fef2f2;border-color:#fecaca;color:#b42318">Xóa</button>
-                </div>`
-            ]))}`;
+            ${table(["Code", "% Giảm", "Trạng thái", "Lượt dùng", "Từ ngày", "Đến ngày", "Thao tác"], coupons.map(c => {
+                const maxUses   = c.max_uses != null ? c.max_uses : null;
+                const collectedCount = c.used_count || 0; // dùng used_count tạm, sẽ update sau khi có query
+                const remaining = maxUses != null ? maxUses - collectedCount : null;
+                const usageText = maxUses != null
+                    ? `<span style="font-weight:700">${collectedCount}</span><span style="color:var(--muted)">/${maxUses}</span>
+                       <div style="margin-top:4px;height:5px;background:#e5e7eb;border-radius:99px;width:72px;overflow:hidden">
+                         <div style="height:100%;border-radius:99px;background:${collectedCount>=maxUses?'#ef4444':'#0f766e'};width:${Math.min(100,Math.round(collectedCount/maxUses*100))}%"></div>
+                       </div>`
+                    : `<span style="color:var(--muted);font-size:12px">∞ Không giới hạn</span>`;
+                return [
+                    `<strong style="font-family:monospace;font-size:14px">${esc(c.code)}</strong>`,
+                    `<span style="font-weight:800;color:var(--primary-dark)">${c.discount_percent}%</span>`,
+                    c.active
+                        ? `<span class="badge" style="background:#ecfdf3;color:#027a48">✓ Đang bật</span>`
+                        : `<span class="badge" style="background:#f3f4f6;color:#6b7280">✗ Tắt</span>`,
+                    usageText,
+                    fmtDate(c.start_date),
+                    fmtDate(c.end_date),
+                    `<div style="display:flex;gap:6px;flex-wrap:wrap">
+                        <button onclick="openEditCoupon(${c.id})" style="background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8">Sửa</button>
+                        <button onclick="toggleCoupon(${c.id},${c.active})" style="background:${c.active?'#fff7ed':'#ecfdf3'};border-color:${c.active?'#fed7aa':'#bbf7d0'};color:${c.active?'#b45309':'#027a48'}">${c.active ? 'Tắt' : 'Bật'}</button>
+                        <button onclick="deleteAdmin('/api/admin/coupons/${c.id}')" style="background:#fef2f2;border-color:#fecaca;color:#b42318">Xóa</button>
+                    </div>`
+                ];
+            }))}`;
         document.getElementById("couponForm").onsubmit = submitCoupon;
     }
     if (state.adminTab === "orders") {
         const orders = await api("/api/admin/orders");
+        const total = orders.length;
+        const page = state.adminPage || 1;
+        const start = (page - 1) * ADMIN_PAGE_SIZE;
+        const end = start + ADMIN_PAGE_SIZE;
+        const paginatedOrders = orders.slice(start, end);
+
         const statusLabel = { PENDING: "Chờ xác nhận", CONFIRMED: "Đã xác nhận", SHIPPING: "Đang giao", DELIVERED: "Đã nhận", CANCELLED: "Đã hủy" };
         const statusOpts = [
             ["PENDING",   "Chờ xác nhận"],
@@ -553,13 +1360,14 @@ async function renderAdminTab(dashboard) {
             ["DELIVERED", "Đã nhận hàng"],
             ["CANCELLED", "Đã hủy"]
         ];
-        panel.innerHTML = table(["Mã", "Khách", "Tổng", "Trạng thái", "Cập nhật"], orders.map(o => [
-            `#${o.id}`, o.username, money(o.total_amount),
+        panel.innerHTML = table(["Mã", "Khách", "Tổng", "Trạng thái", "Cập nhật"], paginatedOrders.map(o => [
+            `#${o.id}`, esc(o.username), money(o.total_amount),
             `<span class="badge status-${String(o.status).toLowerCase()}">${statusLabel[o.status] || o.status}</span>`,
             `<select onchange="updateOrder(${o.id}, this.value)">
                 ${statusOpts.map(([val, label]) => `<option value="${val}" ${val === o.status ? "selected" : ""}>${label}</option>`).join("")}
             </select>`
-        ]));
+        ])) +
+        paginationControls(total, page, "changeAdminPage");
     }
     if (state.adminTab === "users") {
         try {
@@ -568,24 +1376,47 @@ async function renderAdminTab(dashboard) {
                 panel.innerHTML = `<div style="padding:32px;text-align:center;color:var(--muted)">Chưa có người dùng nào.</div>`;
                 return;
             }
+            const total = users.length;
+            const page = state.adminPage || 1;
+            const start = (page - 1) * ADMIN_PAGE_SIZE;
+            const end = start + ADMIN_PAGE_SIZE;
+            const paginatedUsers = users.slice(start, end);
+
             panel.innerHTML = table(
-                ["ID", "Avatar", "Username", "Họ tên", "Email", "SĐT", "Vai trò", "Thao tác"],
-                users.map(u => [
-                    u.id,
-                    `<img src="${u.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(u.username)}`}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;background:#e5e7eb">`,
-                    `<strong>${u.username}</strong>`,
-                    u.full_name || u.fullName || "—",
-                    u.email,
-                    u.phone || "—",
-                    `<span class="badge ${u.role === "ADMIN" ? "badge-admin" : ""}">${u.role === "ADMIN" ? "👑 Admin" : "🛍️ Khách hàng"}</span>`,
-                    u.role !== "ADMIN"
+                ["ID", "Avatar", "Username", "Họ tên", "Email", "SĐT", "Vai trò", "Trạng thái", "Thao tác"],
+                paginatedUsers.map(u => {
+                    const uname = String(u.username || "");
+                    const email = String(u.email || "");
+                    const phone = String(u.phone || "—");
+                    const name  = String(u.full_name || u.fullName || "—");
+                    const avatar = String(u.avatar_url || u.avatarUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(uname)}`);
+                    const statusText = u.status === "BANNED"
+                        ? `<span class="badge" style="background:#fef2f2;color:#b42318;font-size:12px;font-weight:700">✗ Khóa${u.ban_until ? ` (đến ${new Date(u.ban_until).toLocaleDateString("vi-VN")})` : " vĩnh viễn"}</span>`
+                        : `<span class="badge" style="background:#ecfdf3;color:#027a48;font-size:12px;font-weight:700">✓ Hoạt động</span>`;
+                    const actionButtons = u.role !== "ADMIN"
                         ? `<div style="display:flex;gap:6px">
                             <button onclick="openUserDetail(${u.id})" style="background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8">Chi tiết</button>
+                            ${u.status === "BANNED"
+                                ? `<button onclick="toggleUserStatus(${u.id}, 'ACTIVE')" style="background:#ecfdf3;border-color:#bbf7d0;color:#027a48">Mở khóa</button>`
+                                : `<button onclick="toggleUserStatusPrompt(${u.id})" style="background:#fff7ed;border-color:#fed7aa;color:#b45309">Khóa</button>`
+                            }
                             <button onclick="deleteAdmin('/api/admin/users/${u.id}')" style="background:#fef2f2;border-color:#fecaca;color:#b42318">Xóa</button>
                            </div>`
-                        : `<button onclick="openUserDetail(${u.id})" style="background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8">Chi tiết</button>`
-                ])
-            );
+                        : `<button onclick="openUserDetail(${u.id})" style="background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8">Chi tiết</button>`;
+                    return [
+                        u.id,
+                        `<img src="${esc(avatar)}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;background:#e5e7eb">`,
+                        `<strong>${esc(uname)}</strong>`,
+                        esc(name),
+                        esc(email),
+                        esc(phone),
+                        `<span class="badge ${u.role === "ADMIN" ? "badge-admin" : ""}">${u.role === "ADMIN" ? "👑 Admin" : "🛍️ Khách hàng"}</span>`,
+                        statusText,
+                        actionButtons
+                    ];
+                })
+            ) +
+            paginationControls(total, page, "changeAdminPage");
         } catch (err) {
             panel.innerHTML = `<div style="padding:24px;background:#fef2f2;border-radius:8px;color:#b42318;border:1px solid #fecaca">
                 <strong>Lỗi tải danh sách người dùng:</strong> ${err.message}<br>
@@ -594,7 +1425,180 @@ async function renderAdminTab(dashboard) {
         }
     }
     if (state.adminTab === "stock") {
-        panel.innerHTML = table(["Mã", "Sản phẩm", "Tồn kho"], (dashboard.lowStock || []).map(p => [p.id, p.name, p.stock]));
+        panel.innerHTML = table(
+            ["Mã", "Sản phẩm", "Tồn kho hiện tại", "Cập nhật tồn kho", "Thao tác"],
+            (dashboard.lowStock || []).map(p => [
+                p.id,
+                `<strong>${esc(p.name)}</strong>`,
+                `<span style="color:#b42318;font-weight:700">${p.stock}</span>`,
+                `<input type="number" value="${p.stock}" id="stock-input-${p.id}" style="width:90px;padding:6px;margin:0" min="0" class="form-input">`,
+                `<button onclick="updateStock(${p.id})" style="background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8;padding:6px 12px;font-size:13px;font-weight:600">Lưu</button>`
+            ])
+        );
+    }
+
+    if (state.adminTab === "reports") {
+        const period = state.adminPeriod || "all";
+        try {
+            const report = await api(`/api/admin/revenue-report?period=${period}`);
+            panel.innerHTML = `
+                <div class="stats-dashboard">
+                    <!-- Summary Cards -->
+                    <div class="user-stats-cards">
+                        <div class="user-stat-card" style="--accent:#0f766e">
+                            <div class="user-stat-icon">💰</div>
+                            <div class="user-stat-info">
+                                <span class="user-stat-label">Tổng doanh thu</span>
+                                <strong class="user-stat-value">${money(report.totalRevenue)}</strong>
+                            </div>
+                        </div>
+                        <div class="user-stat-card" style="--accent:#2563eb">
+                            <div class="user-stat-icon">🛒</div>
+                            <div class="user-stat-info">
+                                <span class="user-stat-label">Tổng đơn hàng</span>
+                                <strong class="user-stat-value">${report.totalOrders}</strong>
+                            </div>
+                        </div>
+                        <div class="user-stat-card" style="--accent:#7c3aed">
+                            <div class="user-stat-icon">👥</div>
+                            <div class="user-stat-info">
+                                <span class="user-stat-label">Khách hàng</span>
+                                <strong class="user-stat-value">${report.totalCustomers}</strong>
+                            </div>
+                        </div>
+                        <div class="user-stat-card" style="--accent:#d97706">
+                            <div class="user-stat-icon">📊</div>
+                            <div class="user-stat-info">
+                                <span class="user-stat-label">Đơn TB</span>
+                                <strong class="user-stat-value">${money(report.avgOrderValue)}</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Revenue Chart -->
+                    <div class="admin-form-card" style="margin:0;">
+                        <h3>📈 Biểu đồ doanh thu chi tiết</h3>
+                        <div style="position:relative; height:300px; width:100%;">
+                            <canvas id="reportRevenueChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Two column: Top Products + Top Buyers -->
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+                        <div class="admin-form-card" style="margin:0;">
+                            <h3>🏆 Top sản phẩm bán chạy</h3>
+                            <div class="table-wrap" style="margin-top:8px;">
+                                <table style="width:100%;">
+                                    <thead><tr><th>Ảnh</th><th>Sản phẩm</th><th>Đã bán</th><th>Doanh thu</th></tr></thead>
+                                    <tbody>
+                                        ${(report.topProducts || []).map(p => `
+                                            <tr>
+                                                <td><img src="${esc(p.imageUrl || "")}" style="width:36px;height:36px;object-fit:cover;border-radius:6px;background:#e5e7eb"></td>
+                                                <td><strong>${esc(p.name)}</strong></td>
+                                                <td style="font-weight:600;">${p.quantitySold}</td>
+                                                <td style="font-weight:600;color:var(--primary-dark);">${money(p.revenue)}</td>
+                                            </tr>
+                                        `).join("") || '<tr><td colspan="4" style="text-align:center;color:var(--muted)">Chưa có dữ liệu</td></tr>'}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="admin-form-card" style="margin:0;">
+                            <h3>👥 Khách hàng mua nhiều nhất</h3>
+                            <div class="table-wrap" style="margin-top:8px;">
+                                <table style="width:100%;">
+                                    <thead><tr><th>Khách hàng</th><th>Email</th><th>Số đơn</th><th>Tổng chi tiêu</th></tr></thead>
+                                    <tbody>
+                                        ${(report.topBuyers || []).map(b => `
+                                            <tr>
+                                                <td><strong>${esc(b.fullName || b.username)}</strong></td>
+                                                <td style="color:var(--muted);font-size:13px;">${esc(b.email || "—")}</td>
+                                                <td style="font-weight:600;text-align:center;">${b.orderCount}</td>
+                                                <td style="font-weight:600;color:var(--primary-dark);">${money(b.totalSpent)}</td>
+                                            </tr>
+                                        `).join("") || '<tr><td colspan="4" style="text-align:center;color:var(--muted)">Chưa có dữ liệu</td></tr>'}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Order Details -->
+                    <div class="admin-form-card" style="margin:0;">
+                        <h3>📋 Chi tiết đơn hàng gần đây</h3>
+                        <div class="table-wrap" style="margin-top:8px;">
+                            <table style="width:100%;">
+                                <thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Tổng tiền</th><th>Trạng thái</th><th>Ngày đặt</th></tr></thead>
+                                <tbody>
+                                    ${(report.orderDetails || []).map(o => {
+                                        const statusMap = { PENDING:"Chờ xử lý", CONFIRMED:"Đã xác nhận", SHIPPING:"Đang giao", DELIVERED:"Thành công", CANCELLED:"Đã hủy" };
+                                        const colorMap = { PENDING:"#f59e0b", CONFIRMED:"#3b82f6", SHIPPING:"#8b5cf6", DELIVERED:"#10b981", CANCELLED:"#ef4444" };
+                                        return `<tr>
+                                            <td><strong>#${o.id}</strong></td>
+                                            <td>${esc(o.fullName || o.username)}</td>
+                                            <td style="font-weight:600;color:var(--primary-dark);">${money(o.totalAmount)}</td>
+                                            <td><span class="order-badge" style="background:${colorMap[o.status] || "#6b7280"}22;color:${colorMap[o.status] || "#6b7280"};padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700;">${statusMap[o.status] || o.status}</span></td>
+                                            <td style="font-size:13px;color:var(--muted);">${formatDate(o.createdAt)}</td>
+                                        </tr>`;
+                                    }).join("") || '<tr><td colspan="5" style="text-align:center;color:var(--muted)">Chưa có dữ liệu</td></tr>'}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <style>
+                    @media (max-width: 860px) {
+                        .stats-dashboard > div[style*="grid-template-columns"] {
+                            grid-template-columns: 1fr !important;
+                        }
+                    }
+                </style>
+            `;
+
+            // Render revenue chart
+            setTimeout(() => {
+                const ctx = document.getElementById("reportRevenueChart")?.getContext("2d");
+                if (ctx) {
+                    const labels = (report.dailyRevenue || []).map(d => d.label);
+                    const values = (report.dailyRevenue || []).map(d => d.value);
+                    const gradient = ctx.createLinearGradient(0, 0, 0, 280);
+                    gradient.addColorStop(0, "rgba(37, 99, 235, 0.6)");
+                    gradient.addColorStop(1, "rgba(37, 99, 235, 0.05)");
+
+                    new Chart(ctx, {
+                        type: "bar",
+                        data: {
+                            labels,
+                            datasets: [{
+                                label: "Doanh thu (VNĐ)",
+                                data: values,
+                                backgroundColor: gradient,
+                                borderColor: "#2563eb",
+                                borderWidth: 2,
+                                borderRadius: 6,
+                                borderSkipped: false
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    grid: { color: "rgba(0,0,0,0.05)" },
+                                    ticks: { callback: val => new Intl.NumberFormat("vi-VN").format(val) + " đ" }
+                                },
+                                x: { grid: { display: false } }
+                            }
+                        }
+                    });
+                }
+            }, 50);
+
+        } catch (err) {
+            panel.innerHTML = `<div style="margin:24px;padding:20px;background:#fef2f2;border:1px solid #fecaca;border-radius:12px;color:#b42318"><strong>Lỗi tải báo cáo:</strong> ${err.message}</div>`;
+        }
     }
 }
 
@@ -674,11 +1678,11 @@ async function openEditProduct(id) {
                 <button type="button" onclick="document.getElementById('editProductModal').close()">✕</button>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-                <input name="name" placeholder="Tên sản phẩm" value="${p.name || ""}" required>
+                <input name="name" placeholder="Tên sản phẩm" value="${esc(p.name || "")}" required>
                 <input name="price" type="number" min="0" placeholder="Giá" value="${p.price || 0}" required>
                 <input name="stock" type="number" min="0" placeholder="Tồn kho" value="${p.stock || 0}" required>
                 <select name="categoryId">
-                    ${state.categories.map(c => `<option value="${c.id}" ${c.id == valueOf(p,"category_id","categoryId") ? "selected" : ""}>${c.name}</option>`).join("")}
+                    ${state.categories.map(c => `<option value="${c.id}" ${c.id == valueOf(p,"category_id","categoryId") ? "selected" : ""}>${esc(c.name)}</option>`).join("")}
                 </select>
                 <input name="discountPercent" type="number" min="0" max="100" placeholder="% giảm (0-100)" value="${valueOf(p,"discount_percent","discountPercent") || 0}">
                 <label style="display:flex;align-items:center;gap:8px;font-size:14px">
@@ -686,17 +1690,17 @@ async function openEditProduct(id) {
                 </label>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
-                <img id="editImgPreview" src="${valueOf(p,"image_url","imageUrl")||""}"
+                <img id="editImgPreview" src="${esc(valueOf(p,"image_url","imageUrl")||"")}"
                      style="width:64px;height:56px;object-fit:cover;border-radius:8px;background:#e5e7eb;flex-shrink:0">
                 <div class="upload-field" style="flex:1">
-                    <input name="imageUrl" id="editProductImageUrl" placeholder="URL ảnh" value="${valueOf(p,"image_url","imageUrl")||""}">
+                    <input name="imageUrl" id="editProductImageUrl" placeholder="URL ảnh" value="${esc(valueOf(p,"image_url","imageUrl")||"")}">
                     <label class="upload-btn">
                         📁 Tải lên
                         <input type="file" accept="image/*" onchange="uploadEditProductImage(this)" class="hidden">
                     </label>
                 </div>
             </div>
-            <textarea name="description" placeholder="Mô tả" rows="3">${p.description || ""}</textarea>
+            <textarea name="description" placeholder="Mô tả" rows="3">${esc(p.description || "")}</textarea>
             <div style="display:flex;gap:10px;justify-content:flex-end">
                 <button type="button" onclick="document.getElementById('editProductModal').close()">Hủy</button>
                 <button type="submit" class="primary">Lưu thay đổi</button>
@@ -754,8 +1758,8 @@ function openEditCategory(id, encodedName, encodedDesc) {
                 <h3 style="margin:0">Sửa danh mục</h3>
                 <button type="button" onclick="document.getElementById('editCategoryModal').close()">✕</button>
             </div>
-            <input name="name" placeholder="Tên danh mục" value="${name}" required>
-            <input name="description" placeholder="Mô tả" value="${desc}">
+            <input name="name" placeholder="Tên danh mục" value="${esc(name)}" required>
+            <input name="description" placeholder="Mô tả" value="${esc(desc)}">
             <div style="display:flex;gap:10px;justify-content:flex-end">
                 <button type="button" onclick="document.getElementById('editCategoryModal').close()">Hủy</button>
                 <button type="submit" class="primary">Lưu</button>
@@ -791,8 +1795,10 @@ async function openEditCoupon(id) {
                 <button type="button" onclick="document.getElementById('editCouponModal').close()">✕</button>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-                <input name="code" placeholder="Mã code" value="${c.code}" required>
+                <input name="code" placeholder="Mã code" value="${esc(c.code)}" required>
                 <input name="discountPercent" type="number" min="1" max="100" placeholder="% giảm" value="${c.discount_percent}" required>
+                <input name="maxUses" type="number" min="1" placeholder="Số lượt dùng (để trống = không giới hạn)" value="${c.max_uses != null ? c.max_uses : ''}">
+                <div></div>
                 <label style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3px">
                     Ngày bắt đầu<input name="startDate" type="date" value="${toInput(c.start_date)}" style="margin:0">
                 </label>
@@ -820,7 +1826,8 @@ async function openEditCoupon(id) {
                 discountPercent: Number(fd.get("discountPercent")),
                 active: fd.get("active") === "on",
                 startDate: fd.get("startDate") || null,
-                endDate: fd.get("endDate") || null
+                endDate: fd.get("endDate") || null,
+                maxUses: fd.get("maxUses") ? Number(fd.get("maxUses")) : null
             })
         });
         modal.close();
@@ -862,16 +1869,16 @@ async function openUserDetail(userId) {
     const modal = document.createElement("dialog");
     modal.id = "userDetailModal";
     modal.style.cssText = "width:min(520px,calc(100vw - 24px));border:1px solid var(--line);border-radius:16px;padding:0;box-shadow:var(--shadow)";
-    const avatarSrc = u.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(u.username)}`;
-    const rankNextHint = nextName ? `Cần thêm ${money(needed)} để lên <strong>${nextName}</strong>` : "Đã đạt cấp tối đa";
+    const avatarSrc = esc(u.avatar_url || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(u.username)}`);
+    const rankNextHint = nextName ? `Cần thêm ${money(needed)} để lên <strong>${esc(nextName)}</strong>` : "Đã đạt cấp tối đa";
     modal.innerHTML = `
         <div style="padding:24px;display:grid;gap:20px">
             <div style="display:flex;justify-content:space-between;align-items:flex-start">
                 <div style="display:flex;align-items:center;gap:16px">
                     <img src="${avatarSrc}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:3px solid var(--line)">
                     <div>
-                        <h3 style="margin:0;font-size:20px">${u.full_name || u.fullName || u.username}</h3>
-                        <p style="margin:2px 0 0;color:var(--muted);font-size:13px">@${u.username} · ${u.email}</p>
+                        <h3 style="margin:0;font-size:20px">${esc(u.full_name || u.fullName || u.username)}</h3>
+                        <p style="margin:2px 0 0;color:var(--muted);font-size:13px">@${esc(u.username)} · ${esc(u.email)}</p>
                         <span class="badge ${u.role === "ADMIN" ? "badge-admin" : ""}" style="margin-top:6px;display:inline-flex">${u.role === "ADMIN" ? "👑 Admin" : "🛍️ Khách hàng"}</span>
                     </div>
                 </div>
@@ -896,7 +1903,7 @@ async function openUserDetail(userId) {
                 </div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-                ${[["SĐT", u.phone||"Chưa cập nhật"],["Địa chỉ", u.address||"Chưa cập nhật"],
+                ${[["SĐT", esc(u.phone||"Chưa cập nhật")],["Địa chỉ", esc(u.address||"Chưa cập nhật")],
                    ["Tổng đơn", userOrders.length+" đơn"],["Đã nhận", userOrders.filter(o=>o.status==="DELIVERED").length+" đơn"]
                   ].map(([l,v])=>`<div style="background:#f8fafc;border-radius:8px;padding:12px 14px;border:1px solid var(--line)">
                     <p style="margin:0;font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em">${l}</p>
@@ -918,6 +1925,7 @@ async function submitCategory(event) {
 async function submitCoupon(event) {
     event.preventDefault();
     const form = new FormData(event.target);
+    const maxUses = form.get("maxUses");
     await api("/api/admin/coupons", {
         method: "POST",
         body: JSON.stringify({
@@ -925,9 +1933,11 @@ async function submitCoupon(event) {
             discountPercent: Number(form.get("discountPercent")),
             active: true,
             startDate: form.get("startDate") || null,
-            endDate: form.get("endDate") || null
+            endDate: form.get("endDate") || null,
+            maxUses: maxUses ? Number(maxUses) : null
         })
     });
+    toast("Đã thêm mã giảm giá");
     await loadAdmin();
 }
 
@@ -961,12 +1971,116 @@ document.body.addEventListener("click", event => {
     if (button) show(button.dataset.view);
 });
 
+let otpCountdownInterval = null;
+
+function startOtpTimer(email) {
+    if (otpCountdownInterval) clearInterval(otpCountdownInterval);
+
+    const timerEl = document.getElementById("otpTimer");
+    const resendBtn = document.getElementById("resendOtpBtn");
+    if (!timerEl || !resendBtn) return;
+
+    resendBtn.disabled = true;
+    resendBtn.style.opacity = "0.5";
+    resendBtn.style.cursor = "not-allowed";
+
+    let secondsLeft = 60;
+    timerEl.textContent = `Mã OTP hết hạn sau: ${secondsLeft}s`;
+
+    otpCountdownInterval = setInterval(() => {
+        secondsLeft--;
+        if (secondsLeft <= 0) {
+            clearInterval(otpCountdownInterval);
+            timerEl.textContent = "Mã OTP đã hết hạn.";
+            resendBtn.disabled = false;
+            resendBtn.style.opacity = "1";
+            resendBtn.style.cursor = "pointer";
+        } else {
+            timerEl.textContent = `Mã OTP hết hạn sau: ${secondsLeft}s`;
+        }
+    }, 1000);
+
+    resendBtn.onclick = async () => {
+        try {
+            const data = await api("/api/auth/forgot-password", {
+                method: "POST",
+                body: JSON.stringify({ email })
+            });
+            alert("Hệ thống (Dev Mode): Mã OTP mới của bạn là " + data.otp);
+            startOtpTimer(email);
+        } catch (e) {
+            toast(e.message);
+        }
+    };
+}
+
+function setAuthState(mode) {
+    const title = $("#authTitle");
+    const switchBtn = $("#switchAuth");
+    const forgotBtn = $("#forgotAuthBtn");
+
+    document.querySelectorAll("#authForm input").forEach(input => {
+        input.required = false;
+    });
+
+    if (mode === "login") {
+        title.textContent = "Đăng nhập";
+        switchBtn.textContent = "Tạo tài khoản mới";
+        switchBtn.style.display = "";
+        forgotBtn.style.display = "";
+
+        document.querySelectorAll(".login-field").forEach(el => { el.classList.remove("hidden"); el.required = true; });
+        document.querySelectorAll(".register-field, .reset-field").forEach(el => el.classList.add("hidden"));
+    } 
+    else if (mode === "register") {
+        title.textContent = "Đăng ký";
+        switchBtn.textContent = "Tôi đã có tài khoản";
+        switchBtn.style.display = "";
+        forgotBtn.style.display = "none";
+
+        document.querySelectorAll(".login-field, .register-field").forEach(el => { el.classList.remove("hidden"); el.required = true; });
+        document.querySelector("#authForm input[name='phone']").required = false;
+        document.querySelector("#authForm input[name='address']").required = false;
+        document.querySelectorAll(".reset-field").forEach(el => el.classList.add("hidden"));
+    } 
+    else if (mode === "forgot") {
+        title.textContent = "Quên mật khẩu";
+        switchBtn.textContent = "Quay lại đăng nhập";
+        switchBtn.style.display = "";
+        forgotBtn.style.display = "none";
+
+        document.querySelectorAll(".forgot-field").forEach(el => { el.classList.remove("hidden"); el.required = true; });
+        document.querySelectorAll(".login-field, .register-field:not(.forgot-field), .reset-field").forEach(el => el.classList.add("hidden"));
+    } 
+    else if (mode === "reset") {
+        title.textContent = "Đặt lại mật khẩu";
+        switchBtn.textContent = "Quay lại đăng nhập";
+        switchBtn.style.display = "";
+        forgotBtn.style.display = "none";
+
+        document.querySelectorAll(".forgot-field, .reset-field").forEach(el => { el.classList.remove("hidden"); el.required = true; });
+        document.querySelectorAll(".login-field, .register-field:not(.forgot-field)").forEach(el => el.classList.add("hidden"));
+
+        const email = document.querySelector("#authForm input[name='email']").value;
+        startOtpTimer(email);
+    }
+
+    if (mode !== "reset") {
+        if (otpCountdownInterval) {
+            clearInterval(otpCountdownInterval);
+            otpCountdownInterval = null;
+        }
+    }
+}
+
 $("#authButton").onclick = () => {
+    setAuthState("login");
     $("#authDialog").showModal();
 };
 
 $("#logoutButton").onclick = () => {
-    localStorage.clear();
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
     state.token = null;
     state.user = null;
     state.selectedOrderId = null;
@@ -974,42 +2088,129 @@ $("#logoutButton").onclick = () => {
     show("home");
 };
 
-$("#closeAuth").onclick = () => $("#authDialog").close();
+$("#closeAuth").onclick = () => {
+    if (otpCountdownInterval) {
+        clearInterval(otpCountdownInterval);
+        otpCountdownInterval = null;
+    }
+    $("#authDialog").close();
+};
+
 $("#switchAuth").onclick = () => {
-    const register = $("#authTitle").textContent === "Đăng nhập";
-    $("#authTitle").textContent = register ? "Đăng ký" : "Đăng nhập";
-    $("#switchAuth").textContent = register ? "Tôi đã có tài khoản" : "Tạo tài khoản mới";
-    document.querySelectorAll(".register-field").forEach(node => node.classList.toggle("hidden", !register));
+    const title = $("#authTitle").textContent;
+    if (title === "Đăng nhập") {
+        setAuthState("register");
+    } else {
+        setAuthState("login");
+    }
+};
+
+$("#forgotAuthBtn").onclick = () => {
+    setAuthState("forgot");
 };
 
 $("#authForm").onsubmit = async event => {
     event.preventDefault();
     const form = new FormData(event.target);
-    const register = $("#authTitle").textContent === "Đăng ký";
-    const payload = register ? {
-        username: form.get("usernameOrEmail"),
-        email: form.get("email"),
-        password: form.get("password"),
-        fullName: form.get("fullName"),
-        phone: form.get("phone"),
-        address: form.get("address")
-    } : {
-        usernameOrEmail: form.get("usernameOrEmail"),
-        password: form.get("password")
-    };
-    const data = await api(register ? "/api/auth/register" : "/api/auth/login", { method: "POST", body: JSON.stringify(payload) });
-    state.token = data.token;
-    state.user = data.user;
-    localStorage.setItem("token", state.token);
-    localStorage.setItem("user", JSON.stringify(state.user));
-    $("#authDialog").close();
-    syncAuthUi();
-    toast("Đăng nhập thành công");
+    const title = $("#authTitle").textContent;
+
+    try {
+        if (title === "Đăng ký") {
+            const payload = {
+                username: form.get("usernameOrEmail"),
+                email: form.get("email"),
+                password: form.get("password"),
+                fullName: form.get("fullName"),
+                phone: form.get("phone"),
+                address: form.get("address")
+            };
+            if (payload.password.length < 6) {
+                toast("Mật khẩu phải có ít nhất 6 ký tự");
+                return;
+            }
+            if (!/[a-zA-Z]/.test(payload.password) || !/\d/.test(payload.password)) {
+                toast("Mật khẩu phải chứa cả chữ cái và chữ số");
+                return;
+            }
+            if (payload.phone) {
+                const cleanedPhone = payload.phone.replace(/\s+/g, "");
+                if (!/^\d{9,11}$/.test(cleanedPhone)) {
+                    toast("Số điện thoại không hợp lệ (phải gồm 9 đến 11 chữ số)");
+                    return;
+                }
+            }
+            const data = await api("/api/auth/register", { method: "POST", body: JSON.stringify(payload) });
+            state.token = data.token;
+            state.user = data.user;
+            localStorage.setItem("token", state.token);
+            localStorage.setItem("user", JSON.stringify(state.user));
+            $("#authDialog").close();
+            syncAuthUi();
+            toast("Đăng ký thành công");
+        } 
+        else if (title === "Đăng nhập") {
+            const payload = {
+                usernameOrEmail: form.get("usernameOrEmail"),
+                password: form.get("password")
+            };
+            const data = await api("/api/auth/login", { method: "POST", body: JSON.stringify(payload) });
+            state.token = data.token;
+            state.user = data.user;
+            localStorage.setItem("token", state.token);
+            localStorage.setItem("user", JSON.stringify(state.user));
+            $("#authDialog").close();
+            syncAuthUi();
+            toast("Đăng nhập thành công");
+        } 
+        else if (title === "Quên mật khẩu") {
+            const email = form.get("email");
+            const data = await api("/api/auth/forgot-password", {
+                method: "POST",
+                body: JSON.stringify({ email })
+            });
+            alert("Hệ thống (Dev Mode): Mã OTP đặt lại mật khẩu của bạn là " + data.otp);
+            setAuthState("reset");
+        } 
+        else if (title === "Đặt lại mật khẩu") {
+            const email = form.get("email");
+            const otp = form.get("otp");
+            const newPassword = form.get("newPassword");
+            if (newPassword.length < 6) {
+                toast("Mật khẩu mới phải có ít nhất 6 ký tự");
+                return;
+            }
+            if (!/[a-zA-Z]/.test(newPassword) || !/\d/.test(newPassword)) {
+                toast("Mật khẩu mới phải chứa cả chữ cái và chữ số");
+                return;
+            }
+            await api("/api/auth/reset-password", {
+                method: "POST",
+                body: JSON.stringify({ email, otp, newPassword })
+            });
+            if (otpCountdownInterval) {
+                clearInterval(otpCountdownInterval);
+                otpCountdownInterval = null;
+            }
+            toast("Đổi mật khẩu thành công! Hãy đăng nhập lại.");
+            setAuthState("login");
+        }
+    } catch (e) {
+        if (e.message !== "SESSION_EXPIRED") {
+            toast(e.message);
+        }
+    }
 };
 
 $("#profileForm").onsubmit = async event => {
     event.preventDefault();
     const payload = Object.fromEntries(new FormData(event.target));
+    if (payload.phone) {
+        const cleanedPhone = payload.phone.replace(/\s+/g, "");
+        if (!/^\d{9,11}$/.test(cleanedPhone)) {
+            toast("Số điện thoại không hợp lệ (phải gồm 9 đến 11 chữ số)");
+            return;
+        }
+    }
     state.user = await api("/api/auth/me", { method: "PUT", body: JSON.stringify(payload) });
     localStorage.setItem("user", JSON.stringify(state.user));
     await loadProfile();
@@ -1023,12 +2224,41 @@ $("#checkoutForm").onsubmit = async event => {
     state.selectedOrderId = order.id;
     toast("Đặt hàng thành công");
     event.target.reset();
+    updateCartBadge();
     show("orders");
 };
 
 $("#reloadProducts").onclick = loadProducts;
-$("#searchInput").addEventListener("input", () => loadProducts().catch(console.error));
-$("#categoryFilter").addEventListener("change", () => loadProducts().catch(console.error));
+$("#searchInput").addEventListener("input", debounce(() => {
+    // Nếu đang ở trang chủ hoặc view khác → chuyển sang trang sản phẩm để hiện kết quả
+    const productsHidden = document.getElementById("productsView").classList.contains("hidden");
+    if (productsHidden && $("#searchInput").value.trim()) {
+        show("products"); // show() sẽ gọi loadProducts() bên trong
+    } else {
+        loadProducts().catch(console.error);
+    }
+}, 350));
+$("#categoryFilter").addEventListener("change", () => {
+    const productsHidden = document.getElementById("productsView").classList.contains("hidden");
+    if (productsHidden) {
+        show("products");
+    } else {
+        loadProducts().catch(console.error);
+    }
+});
+
+// Filter bar listeners
+["filterMinPrice","filterMaxPrice"].forEach(id => {
+    document.getElementById(id)?.addEventListener("input", debounce(() => loadProducts().catch(console.error), 400));
+});
+["filterMinRating","filterSort"].forEach(id => {
+    document.getElementById(id)?.addEventListener("change", () => loadProducts().catch(console.error));
+});
+document.getElementById("clearFilters")?.addEventListener("click", () => {
+    ["filterMinPrice","filterMaxPrice"].forEach(id => { const el = document.getElementById(id); if(el) el.value=""; });
+    ["filterMinRating","filterSort"].forEach(id => { const el = document.getElementById(id); if(el) el.value = id==="filterSort" ? "newest" : ""; });
+    loadProducts().catch(console.error);
+});
 // Admin nav — event delegation để tránh stale closure
 document.getElementById("adminView").addEventListener("click", async e => {
     const btn = e.target.closest("[data-admin-tab]");
@@ -1037,6 +2267,16 @@ document.getElementById("adminView").addEventListener("click", async e => {
     btn.classList.add("active");
     state.adminTab = btn.dataset.adminTab;
     await loadAdmin();
+});
+
+// Admin period filter listener
+document.getElementById("adminPeriodFilter")?.addEventListener("change", async e => {
+    state.adminPeriod = e.target.value;
+    await loadAdmin();
+});
+
+document.getElementById("userStatsPeriodFilter")?.addEventListener("change", () => {
+    loadUserStats().catch(console.error);
 });
 
 window.addEventListener("error", event => {
@@ -1419,5 +2659,462 @@ async function loadRankCard() {
         }, 100);
     });
 }
+
+// ── Voucher system ──
+let currentVoucherTab = "available";
+
+async function loadVouchers() {
+    requireLogin();
+    const panel = document.getElementById("voucherPanel");
+    panel.innerHTML = `<div style="padding:32px;text-align:center;color:var(--muted)">Đang tải...</div>`;
+    await renderVoucherTab();
+
+    // Tab switching
+    document.querySelectorAll(".voucher-tab").forEach(btn => {
+        btn.onclick = async () => {
+            document.querySelectorAll(".voucher-tab").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            currentVoucherTab = btn.dataset.vtab;
+            await renderVoucherTab();
+        };
+    });
+}
+
+async function renderVoucherTab() {
+    const panel = document.getElementById("voucherPanel");
+    if (!panel) return;
+    try {
+        if (currentVoucherTab === "available") {
+            const vouchers = await api("/api/auth/vouchers/available");
+            if (!vouchers.length) {
+                panel.innerHTML = `<div class="voucher-empty">Hiện chưa có voucher nào khả dụng.</div>`;
+                return;
+            }
+            panel.innerHTML = `<div class="voucher-grid">${vouchers.map(v => voucherCard(v, true)).join("")}</div>`;
+        } else {
+            const vouchers = await api("/api/auth/vouchers/my");
+            if (!vouchers.length) {
+                panel.innerHTML = `<div class="voucher-empty">Bạn chưa thu thập voucher nào.<br>
+                    <button class="cta-ghost" style="margin-top:16px" onclick="document.querySelector('[data-vtab=available]').click()">Xem voucher có sẵn →</button></div>`;
+                return;
+            }
+            panel.innerHTML = `<div class="voucher-grid">${vouchers.map(v => voucherCard(v, false)).join("")}</div>`;
+        }
+    } catch (e) {
+        panel.innerHTML = `<div class="voucher-empty" style="color:#b42318">${e.message}</div>`;
+    }
+}
+
+function voucherCard(v, showCollect) {
+    const today = new Date();
+    const endDate   = v.end_date   ? new Date(v.end_date)   : null;
+    const startDate = v.start_date ? new Date(v.start_date) : null;
+    const isExpired  = endDate   && today > endDate;
+    const notStarted = startDate && today < startDate;
+    const isCollected = Number(v.collected) > 0;
+
+    const maxUses        = v.max_uses != null ? Number(v.max_uses) : null;
+    const collectedCount = Number(v.collected_count || 0);
+    const remaining      = maxUses != null ? maxUses - collectedCount : null;
+    const isSoldOut      = remaining !== null && remaining <= 0;
+
+    const statusBadge = isExpired  ? `<span class="vc-badge vc-expired">Hết hạn</span>`
+        : notStarted               ? `<span class="vc-badge vc-pending">Chưa bắt đầu</span>`
+        : isSoldOut                ? `<span class="vc-badge vc-soldout">Hết phiếu</span>`
+                                   : `<span class="vc-badge vc-active">Đang hoạt động</span>`;
+
+    const expireText = endDate
+        ? `Hết hạn: <strong>${endDate.toLocaleDateString("vi-VN")}</strong>`
+        : `<span style="color:var(--muted)">Không giới hạn thời gian</span>`;
+
+    // Với người dùng: KHÔNG hiện số phiếu kho
+    // Với tab "Thu thập": chỉ hiện thanh progress nếu sắp hết (để tạo urgency)
+    // Với tab "Của tôi": không hiện số kho — chỉ hiện "1 lần sử dụng"
+    const remainText = showCollect
+        ? (remaining !== null && remaining <= 5 && remaining > 0
+            ? `<div class="vc-remain"><div class="vc-remain-bar"><div style="width:${Math.round(remaining/maxUses*100)}%"></div></div><span style="color:#b45309;font-size:12px">Sắp hết phiếu!</span></div>`
+            : ``)
+        : `<div class="vc-remain-info">Sử dụng 1 lần</div>`;
+
+    const actionBtn = showCollect
+        ? (isCollected
+            ? `<button class="vc-btn vc-collected" disabled>✓ Đã thu thập</button>`
+            : isExpired || isSoldOut
+            ? `<button class="vc-btn vc-disabled" disabled>Không khả dụng</button>`
+            : `<button class="vc-btn vc-collect" onclick="collectVoucher(${v.id})">Thu thập</button>`)
+        : `<button class="vc-btn vc-use" onclick="copyAndUse('${v.code}')">Dùng ngay</button>`;
+
+    return `
+    <div class="voucher-card ${isExpired || isSoldOut ? 'vc-dim' : ''}">
+        <div class="vc-left">
+            <div class="vc-pct">-${v.discount_percent}%</div>
+        </div>
+        <div class="vc-right">
+            <div class="vc-top-row">
+                <div>
+                    <div class="vc-code">${v.code}</div>
+                    <div class="vc-expire">${expireText}</div>
+                </div>
+                ${statusBadge}
+            </div>
+            ${remainText}
+            <div class="vc-bottom-row">
+                ${actionBtn}
+            </div>
+        </div>
+    </div>`;
+}
+
+async function collectVoucher(couponId) {
+    try {
+        await api(`/api/auth/vouchers/collect/${couponId}`, { method: "POST" });
+        toast("Đã thu thập voucher thành công!");
+        await renderVoucherTab();
+    } catch (e) {
+        toast(e.message);
+    }
+}
+
+function copyAndUse(code) {
+    show("cart");
+    const tryApply = (tries = 0) => {
+        const btn = document.getElementById("voucherPickerBtn");
+        if (btn) {
+            // Lấy subtotal từ DOM nếu có
+            const totalEl = document.getElementById("cartTotal");
+            const subtotal = totalEl ? 0 : 0; // sẽ được tính lại trong applyVoucher
+            // Điền hidden input trước, loadCart sẽ gọi applyVoucher khi xong
+            const hidden = document.getElementById("couponCodeHidden");
+            if (hidden) hidden.value = code;
+            toast(`Đã chọn mã: ${code}`);
+        } else if (tries < 15) {
+            setTimeout(() => tryApply(tries + 1), 100);
+        }
+    };
+    setTimeout(() => tryApply(), 200);
+}
+
+// ── Trang Đánh giá ──
+async function loadReviews() {
+    requireLogin();
+    const panel = document.getElementById("reviewsPanel");
+    panel.innerHTML = `<div style="padding:32px;text-align:center;color:var(--muted)">Đang tải...</div>`;
+    try {
+        const products = await api("/api/purchased-products");
+        if (!products.length) {
+            panel.innerHTML = `
+                <div class="voucher-empty">
+                    Bạn chưa có sản phẩm nào cần đánh giá.<br>
+                    <button class="cta-ghost" style="margin-top:16px" onclick="show('products')">Mua sắm ngay →</button>
+                </div>`;
+            return;
+        }
+        panel.innerHTML = `<div class="review-products-grid">${products.map(p => reviewProductCard(p)).join("")}</div>`;
+    } catch (e) {
+        panel.innerHTML = `<div class="voucher-empty" style="color:#b42318">${e.message}</div>`;
+    }
+}
+
+function reviewProductCard(p) {
+    const hasReview = p.myRating != null;
+    const stars = [1,2,3,4,5].map(i =>
+        `<span class="rpick-star ${i <= (p.myRating||0) ? 'selected' : ''}"
+              data-val="${i}"
+              onclick="pickReviewStar(this, '${p.id}')">★</span>`
+    ).join("");
+
+    const avgRating = Number(p.avgRating || 0);
+    const finalPrice = Number(p.price) * (100 - Number(p.discountPercent || 0)) / 100;
+
+    // Escape dữ liệu user-generated để tránh XSS
+    const safeName = esc(p.name);
+    const safeImg = esc(p.imageUrl || '');
+    const safeComment = esc(p.myComment || '');
+
+    return `
+    <div class="review-product-card" id="rpc-${p.id}">
+        <div class="rpc-left">
+            <img src="${safeImg}" alt="${safeName}">
+        </div>
+        <div class="rpc-right">
+            <div class="rpc-name">${safeName}</div>
+            <div class="rpc-price">${money(finalPrice)}</div>
+            <div class="rpc-avg">${ratingStars(avgRating)} <span class="muted" style="font-size:12px">${p.reviewCount || 0} đánh giá</span></div>
+
+            ${hasReview ? `
+            <div class="rpc-my-review">
+                <div class="rpc-my-stars">${ratingStars(p.myRating)}</div>
+                <p class="rpc-my-comment">${safeComment || '<span class="muted">Chưa có bình luận</span>'}</p>
+                <button class="rpc-edit-btn" data-pid="${p.id}" data-rating="${p.myRating}" onclick="openReviewFormSafe(this)">Sửa đánh giá</button>
+            </div>` : `
+            <div class="rpc-form" id="rform-${p.id}">
+                <div class="rpick-stars" data-product-id="${p.id}" data-rating="0">${stars}</div>
+                <textarea id="rcomment-${p.id}" placeholder="Viết bình luận của bạn..." rows="2"></textarea>
+                <button class="primary rpc-submit" onclick="submitReviewFromPage(${p.id})">Gửi đánh giá</button>
+            </div>`}
+        </div>
+    </div>`;
+}
+
+function pickReviewStar(el, productId) {
+    const val = parseInt(el.dataset.val);
+    const container = el.closest(".rpick-stars");
+    container.dataset.rating = val;
+    container.querySelectorAll(".rpick-star").forEach((s,i) => {
+        s.classList.toggle("selected", i < val);
+    });
+}
+
+// Safe version: lấy comment từ DOM text thay vì truyền qua template literal
+function openReviewFormSafe(btnEl) {
+    const productId = Number(btnEl.dataset.pid);
+    const currentRating = Number(btnEl.dataset.rating) || 0;
+    const card = document.getElementById(`rpc-${productId}`);
+    const commentEl = card.querySelector(".rpc-my-comment");
+    const currentComment = commentEl ? commentEl.textContent : "";
+    openReviewForm(productId, currentRating, currentComment);
+}
+
+function openReviewForm(productId, currentRating, currentComment) {
+    const card = document.getElementById(`rpc-${productId}`);
+    const reviewDiv = card.querySelector(".rpc-my-review");
+    reviewDiv.innerHTML = `
+        <div class="rpick-stars" data-product-id="${productId}" data-rating="${currentRating}">
+            ${[1,2,3,4,5].map(i =>
+                `<span class="rpick-star ${i <= currentRating ? 'selected' : ''}" data-val="${i}" onclick="pickReviewStar(this, '${productId}')">★</span>`
+            ).join("")}
+        </div>
+        <textarea id="rcomment-${productId}" placeholder="Bình luận..." rows="2"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="primary rpc-submit" onclick="submitReviewFromPage(${productId})">Lưu</button>
+            <button onclick="loadReviews()">Hủy</button>
+        </div>`;
+    // Populate textarea safely (tránh XSS injection qua template literal)
+    const textarea = document.getElementById(`rcomment-${productId}`);
+    if (textarea) textarea.value = currentComment;
+}
+async function submitReviewFromPage(productId) {
+    const container = document.querySelector(`.rpick-stars[data-product-id="${productId}"]`);
+    const rating = parseInt(container?.dataset.rating || "0");
+    if (!rating) { toast("Vui lòng chọn số sao"); return; }
+    const comment = document.getElementById(`rcomment-${productId}`)?.value || "";
+    try {
+        await api("/api/reviews", { method: "POST", body: JSON.stringify({ productId, rating, comment }) });
+        toast("Đã lưu đánh giá!");
+        await loadReviews();
+    } catch (e) {
+        toast(e.message);
+    }
+}
+
+// ============================================================
+// WISH LIST SYSTEM & TOGGLES
+// ============================================================
+async function loadWishlist() {
+    requireLogin();
+    const wishlist = await api("/api/wishlist");
+    const container = $("#wishlistGrid");
+    if (!wishlist.length) {
+        container.innerHTML = `
+            <div class="empty-state" style="grid-column:1/-1;text-align:center;padding:48px 0;border:none;box-shadow:none;">
+                <div class="empty-icon" style="font-size:48px;margin-bottom:12px;">❤️</div>
+                <p class="muted">Danh sách yêu thích của bạn đang trống.</p>
+                <button class="primary" onclick="show('products')">Xem sản phẩm</button>
+            </div>`;
+        return;
+    }
+    container.innerHTML = wishlist.map(productCard).join("");
+    updateWishlistButtons().catch(() => {});
+}
+
+window.toggleWishlist = async function(productId, event) {
+    if (event) event.stopPropagation();
+    requireLogin();
+    try {
+        const res = await api(`/api/wishlist/${productId}`, { method: "POST" });
+        if (res.added) {
+            toast("Đã thêm vào danh sách yêu thích");
+        } else {
+            toast("Đã xóa khỏi danh sách yêu thích");
+        }
+        updateWishlistButtons().catch(() => {});
+        if (!document.getElementById("wishlistView").classList.contains("hidden")) {
+            await loadWishlist();
+        }
+    } catch (e) {
+        toast(e.message);
+    }
+};
+
+async function updateWishlistButtons() {
+    if (!state.user) return;
+    try {
+        const ids = await api("/api/wishlist/ids");
+        document.querySelectorAll(".wishlist-btn").forEach(btn => {
+            const pid = Number(btn.dataset.productId);
+            const active = ids.includes(pid);
+            btn.classList.toggle("active", active);
+            btn.innerHTML = active ? "❤️" : "🤍";
+        });
+    } catch (_) {}
+}
+
+// ============================================================
+// PRICE DROP NOTIFICATIONS SYSTEM
+// ============================================================
+async function loadWishlistNotifications() {
+    if (!state.user) return;
+    try {
+        const notifs = await api("/api/wishlist/notifications");
+        const badge = document.getElementById("notifCount");
+        const list = document.getElementById("notifList");
+        if (badge) {
+            badge.textContent = notifs.length;
+            badge.style.display = notifs.length > 0 ? "flex" : "none";
+        }
+        if (list) {
+            if (!notifs.length) {
+                list.innerHTML = `<div class="notif-empty">Không có thông báo mới</div>`;
+            } else {
+                list.innerHTML = notifs.map(n => {
+                    const oldP = Number(n.oldPrice || n.old_price || 0);
+                    const newP = Number(n.newPrice || n.new_price || 0);
+                    const diff = oldP - newP;
+                    return `
+                        <div class="notif-item" onclick="openProduct(${n.id})">
+                            <img src="${esc(n.imageUrl)}" alt="${esc(n.name)}">
+                            <div class="notif-item-body">
+                                <strong>${esc(n.name)}</strong> giảm giá mạnh!
+                                <div><span class="muted">${money(oldP)}</span> → <strong style="color:#16a34a">${money(newP)}</strong></div>
+                                <div style="font-size:11px;color:#16a34a;font-weight:600;">Tiết kiệm ${money(diff)}!</div>
+                            </div>
+                        </div>`;
+                }).join("");
+            }
+        }
+    } catch (_) {}
+}
+
+// Event delegation for notification dropdown toggle
+document.addEventListener("click", event => {
+    const container = document.getElementById("notifBellContainer");
+    const dropdown = document.getElementById("notifDropdown");
+    const btn = document.getElementById("notifBellBtn");
+    const closeBtn = document.getElementById("closeNotifBtn");
+
+    if (!container || !dropdown || !btn) return;
+
+    if (btn.contains(event.target)) {
+        event.stopPropagation();
+        const open = dropdown.style.display !== "none";
+        dropdown.style.display = open ? "none" : "block";
+        if (!open) {
+            loadWishlistNotifications().catch(() => {});
+        }
+    } else if (closeBtn && closeBtn.contains(event.target)) {
+        dropdown.style.display = "none";
+    } else if (!dropdown.contains(event.target)) {
+        dropdown.style.display = "none";
+    }
+});
+
+// ============================================================
+// PASSWORD CHANGE FORM LISTENER
+// ============================================================
+$("#changePasswordForm").onsubmit = async event => {
+    event.preventDefault();
+    const form = event.target;
+    const currentPassword = form.currentPassword.value;
+    const newPassword = form.newPassword.value;
+    const confirmPassword = form.confirmPassword.value;
+    if (newPassword.length < 6) {
+        toast("Mật khẩu mới phải có ít nhất 6 ký tự");
+        return;
+    }
+    if (!/[a-zA-Z]/.test(newPassword) || !/\d/.test(newPassword)) {
+        toast("Mật khẩu mới phải chứa cả chữ cái và chữ số");
+        return;
+    }
+    if (newPassword !== confirmPassword) {
+        toast("Mật khẩu xác nhận không khớp");
+        return;
+    }
+    try {
+        await api("/api/auth/change-password", {
+            method: "POST",
+            body: JSON.stringify({ currentPassword, newPassword })
+        });
+        toast("Đổi mật khẩu thành công!");
+        form.reset();
+    } catch (e) {
+        toast(e.message);
+    }
+};
+
+// Hook wishlist and notifications into WS STOMP product updates
+const origHandleProductEvent = handleProductEvent;
+window.handleProductEvent = function(event) {
+    origHandleProductEvent(event);
+    if (event.action === "updated" && state.user) {
+        loadWishlistNotifications().catch(() => {});
+        updateWishlistButtons().catch(() => {});
+    }
+};
+
+function initGoogleSignIn() {
+    if (typeof google === "undefined" || !google.accounts || !google.accounts.id) {
+        setTimeout(initGoogleSignIn, 100);
+        return;
+    }
+
+    google.accounts.id.initialize({
+        client_id: "1071806914161-c05nk1ag6062biten5vg5ara4ns7l63j.apps.googleusercontent.com",
+        callback: handleGoogleCredentialResponse
+    });
+
+    google.accounts.id.renderButton(
+        document.getElementById("googleBtn"),
+        { theme: "outline", size: "large", width: 240 }
+    );
+}
+
+async function handleGoogleCredentialResponse(response) {
+    try {
+        const credential = response.credential;
+        const data = await api("/api/auth/google", {
+            method: "POST",
+            body: JSON.stringify({ credential })
+        });
+        state.token = data.token;
+        state.user = data.user;
+        localStorage.setItem("token", state.token);
+        localStorage.setItem("user", JSON.stringify(state.user));
+        $("#authDialog").close();
+        syncAuthUi();
+        toast("Đăng nhập bằng Google thành công");
+    } catch (err) {
+        toast("Đăng nhập bằng Google thất bại: " + err.message);
+    }
+}
+
+window.toggleUserStatus = async function(userId, status, banDays = 0) {
+    try {
+        await api(`/api/admin/users/${userId}/status`, {
+            method: "PUT",
+            body: JSON.stringify({ status, banDays })
+        });
+        toast("Đã cập nhật trạng thái người dùng");
+        await loadAdmin();
+    } catch (e) {
+        toast(e.message);
+    }
+};
+
+window.toggleUserStatusPrompt = function(userId) {
+    const daysStr = prompt("Nhập số ngày muốn khóa tài khoản này (để trống hoặc 0 để khóa vĩnh viễn):", "0");
+    if (daysStr === null) return;
+    const days = parseInt(daysStr) || 0;
+    toggleUserStatus(userId, "BANNED", days);
+};
 
 loadBase().catch(error => toast(error.message));

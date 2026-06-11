@@ -42,30 +42,43 @@ public class CatalogService {
 
     public void deleteCategory(long id) {
         category(id);
-        jdbc.update("DELETE FROM categories WHERE id=?", id);
+        jdbc.update("UPDATE products SET category_id = NULL WHERE category_id = ?", id);
+        jdbc.update("DELETE FROM categories WHERE id = ?", id);
     }
 
-    public List<Map<String, Object>> products(String search, Long categoryId, Boolean featured) {
+    public List<Map<String, Object>> products(String search, Long categoryId, Boolean featured,
+                                               java.math.BigDecimal minPrice, java.math.BigDecimal maxPrice,
+                                               Double minRating, String sortBy) {
         StringBuilder sql = new StringBuilder("""
                 SELECT p.*, c.name category_name,
                        COALESCE(ROUND(AVG(r.rating), 1), 0) average_rating,
-                       COUNT(r.id) review_count
+                       COUNT(r.id) review_count,
+                       ROUND(p.price * (100 - p.discount_percent) / 100, 2) sale_price
                 FROM products p
                 LEFT JOIN categories c ON c.id=p.category_id
                 LEFT JOIN reviews r ON r.product_id=p.id
                 WHERE 1=1
                 """);
+        java.util.ArrayList<Object> args = new java.util.ArrayList<>();
         if (search != null && !search.isBlank()) {
-            sql.append(" AND (LOWER(p.name) LIKE LOWER('%").append(search.replace("'", "''")).append("%') OR LOWER(p.description) LIKE LOWER('%").append(search.replace("'", "''")).append("%'))");
+            sql.append(" AND (LOWER(p.name) LIKE LOWER(?) OR LOWER(p.description) LIKE LOWER(?) OR LOWER(c.name) LIKE LOWER(?))");
+            String pattern = "%" + search.trim() + "%";
+            args.add(pattern);
+            args.add(pattern);
+            args.add(pattern);
         }
-        if (categoryId != null) {
-            sql.append(" AND p.category_id=").append(categoryId);
-        }
-        if (featured != null) {
-            sql.append(" AND p.featured=").append(featured ? "TRUE" : "FALSE");
-        }
-        sql.append(" GROUP BY p.id, c.name ORDER BY p.created_at DESC");
-        return jdbc.queryForList(sql.toString());
+        if (categoryId != null) { sql.append(" AND p.category_id=?"); args.add(categoryId); }
+        if (featured != null)   { sql.append(" AND p.featured=?"); args.add(featured); }
+        if (minPrice != null)   { sql.append(" AND (p.price * (100 - p.discount_percent) / 100) >= ?"); args.add(minPrice); }
+        if (maxPrice != null)   { sql.append(" AND (p.price * (100 - p.discount_percent) / 100) <= ?"); args.add(maxPrice); }
+        sql.append(" GROUP BY p.id, c.name");
+        if (minRating != null)  { sql.append(" HAVING average_rating >= ?"); args.add(minRating); }
+        // Sort — chỉ dùng whitelist, không interpolate user input
+        if ("price_asc".equals(sortBy))        sql.append(" ORDER BY sale_price ASC");
+        else if ("price_desc".equals(sortBy))  sql.append(" ORDER BY sale_price DESC");
+        else if ("rating".equals(sortBy))      sql.append(" ORDER BY average_rating DESC");
+        else                                   sql.append(" ORDER BY p.created_at DESC");
+        return jdbc.queryForList(sql.toString(), args.toArray());
     }
 
     public Map<String, Object> product(long id) {
@@ -93,20 +106,45 @@ public class CatalogService {
     }
 
     public Map<String, Object> updateProduct(long id, ProductRequest request) {
-        product(id);
+        Map<String, Object> old = product(id);
         validateProduct(request);
+        // Ghi lịch sử giá nếu giá hoặc discount thay đổi
+        java.math.BigDecimal oldPrice    = (java.math.BigDecimal) old.get("price");
+        int oldDiscount = old.get("discount_percent") != null ? ((Number) old.get("discount_percent")).intValue() : 0;
+        int newDiscount = safeDiscount(request.discountPercent());
+        boolean priceChanged = request.price() != null && !request.price().equals(oldPrice);
+        boolean discountChanged = newDiscount != oldDiscount;
         jdbc.update("""
                         UPDATE products
                         SET name=?, description=?, price=?, stock=?, image_url=?, category_id=?, featured=?, discount_percent=?
                         WHERE id=?
                         """,
                 request.name(), request.description(), request.price(), request.stock(), request.imageUrl(),
-                request.categoryId(), Boolean.TRUE.equals(request.featured()), safeDiscount(request.discountPercent()), id);
+                request.categoryId(), Boolean.TRUE.equals(request.featured()), newDiscount, id);
+        if (priceChanged || discountChanged) {
+            jdbc.update("""
+                INSERT INTO price_history(product_id, old_price, new_price, old_discount, new_discount)
+                VALUES(?,?,?,?,?)
+                """, id, oldPrice, request.price(), oldDiscount, newDiscount);
+        }
         return product(id);
+    }
+
+    public List<Map<String, Object>> priceHistory(long productId) {
+        product(productId);
+        return jdbc.queryForList("""
+            SELECT * FROM price_history WHERE product_id=? ORDER BY changed_at DESC LIMIT 20
+            """, productId);
     }
 
     public void deleteProduct(long id) {
         product(id);
+        // Cascade delete tất cả dữ liệu liên quan trước khi xóa sản phẩm
+        jdbc.update("DELETE FROM wishlists WHERE product_id=?", id);
+        jdbc.update("DELETE FROM price_history WHERE product_id=?", id);
+        jdbc.update("DELETE FROM cart_items WHERE product_id=?", id);
+        jdbc.update("DELETE FROM reviews WHERE product_id=?", id);
+        jdbc.update("DELETE FROM order_items WHERE product_id=?", id);
         jdbc.update("DELETE FROM products WHERE id=?", id);
     }
 

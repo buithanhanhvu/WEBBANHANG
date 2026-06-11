@@ -32,9 +32,9 @@ public class AdminController {
     }
 
     @GetMapping("/dashboard")
-    public ApiResponse<Map<String, Object>> dashboard(HttpServletRequest request) {
+    public ApiResponse<Map<String, Object>> dashboard(@RequestParam(value = "period", required = false, defaultValue = "all") String period, HttpServletRequest request) {
         currentUserService.requireAdmin(request);
-        return ApiResponse.ok(shopService.dashboard());
+        return ApiResponse.ok(shopService.dashboard(period));
     }
 
     // ── Categories ──
@@ -124,6 +124,16 @@ public class AdminController {
         return ApiResponse.ok(shopService.allUsers());
     }
 
+    @PutMapping("/users/{id}/status")
+    public ApiResponse<Void> updateUserStatus(@PathVariable long id, @RequestBody Map<String, Object> body, HttpServletRequest request) {
+        currentUserService.requireAdmin(request);
+        String status = String.valueOf(body.get("status"));
+        Integer banDays = (Integer) body.get("banDays");
+        shopService.updateUserStatus(id, status, banDays);
+        return ApiResponse.ok("Updated", null);
+    }
+
+
     @DeleteMapping("/users/{id}")
     public ApiResponse<Void> deleteUser(@PathVariable long id, HttpServletRequest request) {
         currentUserService.requireAdmin(request);
@@ -151,5 +161,15 @@ public class AdminController {
         Map<String, Object> result = shopService.updateOrderStatus(id, body.status());
         realtimeService.orderChanged("status_updated", Map.of("id", id, "status", body.status()));
         return ApiResponse.ok(result);
+    }
+
+    // ── Revenue Report ──
+
+    @GetMapping("/revenue-report")
+    public ApiResponse<Map<String, Object>> revenueReport(
+            @RequestParam(value = "period", required = false, defaultValue = "all") String period,
+            HttpServletRequest request) {
+        currentUserService.requireAdmin(request);
+        return ApiResponse.ok(shopService.getAdminRevenueReport(period));
     }
 }

@@ -4,7 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Mini E-Commerce</title>
-<link rel="stylesheet" href="/styles.css?v=10">
+<link rel="stylesheet" href="/styles.css?v=21">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- SockJS + STOMP cho WebSocket realtime -->
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
@@ -16,11 +17,29 @@
         <input id="searchInput" placeholder="Tìm sản phẩm">
         <select id="categoryFilter"></select>
     </div>
-    <nav>
+    <nav style="display:flex;align-items:center;gap:8px;">
         <button data-view="products">Sản phẩm</button>
         <button data-view="cart">Giỏ hàng</button>
+        <button data-view="wishlist" class="user-only hidden">Yêu thích</button>
         <button data-view="orders">Đơn hàng</button>
+        <button data-view="reviews" class="user-only hidden">Đánh giá</button>
+        <button data-view="vouchers" class="user-only hidden">Voucher</button>
+        <button data-view="userStats" class="user-only hidden">Chi tiêu</button>
         <button data-view="admin" class="admin-only hidden">Admin</button>
+        <div id="notifBellContainer" class="notif-container user-only hidden">
+            <button id="notifBellBtn" class="notif-btn" title="Thông báo giảm giá">
+                🔔<span id="notifCount" class="notif-badge" style="display:none">0</span>
+            </button>
+            <div id="notifDropdown" class="notif-dropdown" style="display:none">
+                <div class="notif-header">
+                    <strong>Thông báo giảm giá</strong>
+                    <button id="closeNotifBtn" class="clear-notif-btn">✕</button>
+                </div>
+                <div id="notifList" class="notif-list">
+                    <div class="notif-empty">Không có thông báo mới</div>
+                </div>
+            </div>
+        </div>
         <button id="profileButton" class="user-only hidden" data-view="profile"></button>
         <button id="logoutButton" class="user-only hidden">Thoát</button>
         <button id="authButton">Đăng nhập</button>
@@ -98,6 +117,36 @@
             </div>
             <button id="reloadProducts">Làm mới</button>
         </div>
+        <!-- Filter bar -->
+        <div class="filter-bar">
+            <div class="filter-group">
+                <label class="filter-label">Giá từ</label>
+                <input type="number" id="filterMinPrice" placeholder="0" min="0" class="filter-input">
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">Đến</label>
+                <input type="number" id="filterMaxPrice" placeholder="Không giới hạn" min="0" class="filter-input">
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">Đánh giá tối thiểu</label>
+                <select id="filterMinRating" class="filter-input">
+                    <option value="">Tất cả</option>
+                    <option value="4">4★ trở lên</option>
+                    <option value="3">3★ trở lên</option>
+                    <option value="2">2★ trở lên</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">Sắp xếp</label>
+                <select id="filterSort" class="filter-input">
+                    <option value="newest">Mới nhất</option>
+                    <option value="price_asc">Giá tăng dần</option>
+                    <option value="price_desc">Giá giảm dần</option>
+                    <option value="rating">Đánh giá cao nhất</option>
+                </select>
+            </div>
+            <button id="clearFilters" class="filter-clear">Xóa bộ lọc</button>
+        </div>
         <div id="productsGrid" class="product-grid"></div>
     </section>
 
@@ -116,7 +165,16 @@
             <div id="cartItems" class="panel"></div>
             <form id="checkoutForm" class="panel form">
                 <h3>Thanh toán</h3>
-                <input name="couponCode" placeholder="Mã giảm giá, ví dụ WELCOME10">
+                <!-- Ô ẩn chứa mã, không hiện cho user nhập tay -->
+                <input name="couponCode" id="couponCodeHidden" type="hidden">
+                <!-- Picker voucher -->
+                <div id="voucherPickerArea">
+                    <button type="button" id="voucherPickerBtn" class="voucher-picker-btn">
+                        <span id="voucherPickerLabel">🎫 Chọn mã giảm giá</span>
+                        <span class="voucher-picker-arrow">›</span>
+                    </button>
+                    <div id="voucherPickerList" class="voucher-picker-list" style="display:none"></div>
+                </div>
                 <input name="shippingName" placeholder="Người nhận" required>
                 <input name="shippingPhone" placeholder="Số điện thoại" required>
                 <input name="shippingAddress" placeholder="Địa chỉ giao hàng" required>
@@ -159,17 +217,26 @@
                 <span id="profileRoleBadge" class="profile-role-badge"></span>
                 <div class="profile-info-list" id="profileInfoList"></div>
             </div>
-            <form id="profileForm" class="panel form">
-                <h3>Cập nhật thông tin</h3>
-                <input name="fullName" placeholder="Họ tên" required>
-                <input name="email" type="email" placeholder="Email" required>
-                <input name="phone" placeholder="Số điện thoại">
-                <input name="address" placeholder="Địa chỉ">
-                <div class="url-or-file">
-                    <input name="avatarUrl" id="avatarUrlInput" placeholder="URL ảnh đại diện (hoặc tải lên từ máy ở trái)">
-                </div>
-                <button class="primary">Lưu hồ sơ</button>
-            </form>
+            <div style="display:grid;gap:18px">
+                <form id="profileForm" class="panel form" style="margin:0">
+                    <h3>Cập nhật thông tin</h3>
+                    <input name="fullName" placeholder="Họ tên" required>
+                    <input name="email" type="email" placeholder="Email" required>
+                    <input name="phone" placeholder="Số điện thoại">
+                    <input name="address" placeholder="Địa chỉ">
+                    <div class="url-or-file">
+                        <input name="avatarUrl" id="avatarUrlInput" placeholder="URL ảnh đại diện (hoặc tải lên từ máy ở trái)">
+                    </div>
+                    <button class="primary">Lưu hồ sơ</button>
+                </form>
+                <form id="changePasswordForm" class="panel form" style="margin:0">
+                    <h3>Đổi mật khẩu</h3>
+                    <input name="currentPassword" type="password" placeholder="Mật khẩu hiện tại" required>
+                    <input name="newPassword" type="password" placeholder="Mật khẩu mới (tối thiểu 6 ký tự)" required>
+                    <input name="confirmPassword" type="password" placeholder="Xác nhận mật khẩu mới" required>
+                    <button class="primary">Đổi mật khẩu</button>
+                </form>
+            </div>
         </div>
     </section>
 
@@ -181,7 +248,11 @@
                     <span class="admin-logo">⚡ Admin</span>
                 </div>
                 <nav class="admin-nav">
-                    <button class="admin-nav-item active" data-admin-tab="products">
+                    <button class="admin-nav-item active" data-admin-tab="dashboard">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                        Thống kê
+                    </button>
+                    <button class="admin-nav-item" data-admin-tab="products">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
                         Sản phẩm
                     </button>
@@ -205,15 +276,28 @@
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
                         Tồn kho thấp
                     </button>
+                    <button class="admin-nav-item" data-admin-tab="reports">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        Báo cáo
+                    </button>
                 </nav>
             </aside>
 
             <!-- Main content -->
             <div class="admin-main">
-                <div class="admin-topbar">
+                <div class="admin-topbar" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
                     <div>
                         <p class="eyebrow" style="margin:0">ADMIN</p>
                         <h2 id="adminTabTitle" style="margin:0;font-size:22px;font-weight:800">Dashboard</h2>
+                    </div>
+                    <div id="adminPeriodFilterWrapper">
+                        <select id="adminPeriodFilter" class="form-input" style="width:160px; margin:0; padding:6px 12px; border-radius:8px; font-weight:600; cursor:pointer;">
+                            <option value="all">Tất cả thời gian</option>
+                            <option value="today">Hôm nay</option>
+                            <option value="week">Tuần này</option>
+                            <option value="month">Tháng này</option>
+                            <option value="year">Năm nay</option>
+                        </select>
                     </div>
                 </div>
                 <div id="adminStats" class="admin-stats-grid"></div>
@@ -221,6 +305,66 @@
             </div>
         </div>
     </section>
+    <section id="reviewsView" class="view hidden">
+        <div class="section-head">
+            <div>
+                <p class="eyebrow">Đánh giá</p>
+                <h2>Sản phẩm đã mua</h2>
+            </div>
+        </div>
+        <div id="reviewsPanel"></div>
+    </section>
+
+    <section id="vouchersView" class="view hidden">
+        <div class="section-head">
+            <div>
+                <p class="eyebrow">Voucher</p>
+                <h2>Ví voucher của tôi</h2>
+            </div>
+        </div>
+        <div class="voucher-tabs">
+            <button class="voucher-tab active" data-vtab="available">🎁 Thu thập voucher</button>
+            <button class="voucher-tab" data-vtab="my">🎫 Voucher của tôi</button>
+        </div>
+        <div id="voucherPanel"></div>
+    </section>
+
+    <section id="wishlistView" class="view hidden">
+        <div class="section-head">
+            <div>
+                <p class="eyebrow">Wishlist</p>
+                <h2>Sản phẩm yêu thích</h2>
+            </div>
+        </div>
+        <div id="wishlistGrid" class="product-grid"></div>
+    </section>
+
+    <section id="userStatsView" class="view hidden">
+        <div class="section-head" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+            <div>
+                <p class="eyebrow">Thống kê chi tiêu</p>
+                <h2>Phân tích chi tiêu cá nhân</h2>
+            </div>
+            <select id="userStatsPeriodFilter" class="form-input" style="width:170px;padding:8px 14px;border-radius:10px;font-weight:600;cursor:pointer;border:2px solid var(--line);">
+                <option value="all">Tất cả thời gian</option>
+                <option value="today">Hôm nay</option>
+                <option value="week">Tuần này</option>
+                <option value="month" selected>Tháng này</option>
+                <option value="year">Năm nay</option>
+            </select>
+        </div>
+        <div id="userStatsPanel"></div>
+    </section>
+
+    <section id="notFoundView" class="view hidden">
+        <div class="empty-state" style="text-align:center;padding:48px 20px;">
+            <div class="empty-icon" style="font-size:72px;margin-bottom:16px;">🔍</div>
+            <h2>404 - Không tìm thấy trang</h2>
+            <p class="muted" style="margin-bottom:24px;">Trang bạn đang tìm kiếm không tồn tại hoặc đã bị di chuyển.</p>
+            <button class="primary" data-view="home">Quay lại Trang chủ</button>
+        </div>
+    </section>
+
 </main>
 
 <dialog id="authDialog">
@@ -229,19 +373,34 @@
             <h3 id="authTitle">Đăng nhập</h3>
             <button type="button" id="closeAuth">Đóng</button>
         </div>
-        <input name="usernameOrEmail" placeholder="Username hoặc email" required>
-        <input name="password" type="password" placeholder="Mật khẩu" required>
-        <input name="email" class="register-field hidden" type="email" placeholder="Email">
+        <input name="usernameOrEmail" class="login-field" placeholder="Username hoặc email" required>
+        <input name="password" class="login-field" type="password" placeholder="Mật khẩu" required>
+        <input name="email" class="register-field forgot-field hidden" type="email" placeholder="Email">
         <input name="fullName" class="register-field hidden" placeholder="Họ tên">
         <input name="phone" class="register-field hidden" placeholder="Số điện thoại">
         <input name="address" class="register-field hidden" placeholder="Địa chỉ">
+        
+        <input name="otp" class="reset-field hidden" placeholder="Mã OTP gồm 6 chữ số">
+        <input name="newPassword" class="reset-field hidden" type="password" placeholder="Mật khẩu mới">
+        <div id="otpTimer" class="reset-field hidden" style="text-align: center; font-size: 13px; margin: 8px 0; font-weight: 600; color: var(--primary);"></div>
+        <button type="button" id="resendOtpBtn" class="reset-field hidden" style="width:100%; margin-bottom:8px; background:none; border:1px dashed var(--primary); color:var(--primary); font-size:13px; cursor:pointer; min-height:36px; border-radius:6px;">Gửi lại mã</button>
+
         <button class="primary">Tiếp tục</button>
         <button type="button" id="switchAuth">Tạo tài khoản mới</button>
+        <button type="button" id="forgotAuthBtn" style="background:none;border:none;color:var(--primary);text-decoration:underline;cursor:pointer;font-size:12.5px;padding:4px 0;margin-top:4px;">Quên mật khẩu?</button>
+        <div class="auth-divider" style="text-align: center; margin: 12px 0; color: var(--text-muted); position: relative;">
+            <span style="background: var(--bg-surface); padding: 0 8px; position: relative; z-index: 1; font-size: 13px;">Hoặc đăng nhập bằng</span>
+            <div style="position: absolute; top: 50%; left: 0; right: 0; border-top: 1px solid var(--border); z-index: 0;"></div>
+        </div>
+        <div style="display: flex; justify-content: center; margin-bottom: 8px;">
+            <div id="googleBtn"></div>
+        </div>
         <p class="hint">Admin: admin/admin123. Customer: customer/customer123.</p>
     </form>
 </dialog>
 
 <div id="toast"></div>
-<script src="/app.js?v=10"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="/app.js?v=21"></script>
 </body>
 </html>

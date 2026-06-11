@@ -26,6 +26,7 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void createTables() {
+        // 1. Independent tables (no foreign keys)
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -40,7 +41,7 @@ public class DataInitializer implements CommandLineRunner {
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
                 """);
-        addColumnIfMissing("users", "avatar_url", "VARCHAR(500)");
+
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS categories (
                     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -48,6 +49,27 @@ public class DataInitializer implements CommandLineRunner {
                     description VARCHAR(500)
                 )
                 """);
+
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS coupons (
+                    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                    code VARCHAR(50) NOT NULL UNIQUE,
+                    discount_percent INT NOT NULL,
+                    active BOOLEAN DEFAULT TRUE,
+                    start_date DATE,
+                    end_date DATE
+                )
+                """);
+
+        // 2. Tables dependent only on previous ones
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS password_resets (
+                    email VARCHAR(160) PRIMARY KEY,
+                    otp_code VARCHAR(10) NOT NULL,
+                    expiry_time TIMESTAMP NOT NULL
+                )
+                """);
+
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS products (
                     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -63,16 +85,45 @@ public class DataInitializer implements CommandLineRunner {
                     FOREIGN KEY (category_id) REFERENCES categories(id)
                 )
                 """);
+
+        // 3. Tables dependent on users, coupons, and products
         jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS coupons (
+                CREATE TABLE IF NOT EXISTS user_coupons (
                     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-                    code VARCHAR(50) NOT NULL UNIQUE,
-                    discount_percent INT NOT NULL,
-                    active BOOLEAN DEFAULT TRUE,
-                    start_date DATE,
-                    end_date DATE
+                    user_id BIGINT NOT NULL,
+                    coupon_id BIGINT NOT NULL,
+                    collected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY uk_user_coupon (user_id, coupon_id),
+                    FOREIGN KEY (user_id) REFERENCES users(id),
+                    FOREIGN KEY (coupon_id) REFERENCES coupons(id)
                 )
                 """);
+
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS wishlists (
+                    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                    user_id BIGINT NOT NULL,
+                    product_id BIGINT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY uk_wish_user_product (user_id, product_id),
+                    FOREIGN KEY (user_id) REFERENCES users(id),
+                    FOREIGN KEY (product_id) REFERENCES products(id)
+                )
+                """);
+
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS price_history (
+                    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                    product_id BIGINT NOT NULL,
+                    old_price DECIMAL(12,2),
+                    new_price DECIMAL(12,2),
+                    old_discount INT,
+                    new_discount INT,
+                    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (product_id) REFERENCES products(id)
+                )
+                """);
+
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS cart_items (
                     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -84,6 +135,7 @@ public class DataInitializer implements CommandLineRunner {
                     FOREIGN KEY (product_id) REFERENCES products(id)
                 )
                 """);
+
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS orders (
                     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -101,6 +153,7 @@ public class DataInitializer implements CommandLineRunner {
                     FOREIGN KEY (coupon_id) REFERENCES coupons(id)
                 )
                 """);
+
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS order_items (
                     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -113,6 +166,7 @@ public class DataInitializer implements CommandLineRunner {
                     FOREIGN KEY (product_id) REFERENCES products(id)
                 )
                 """);
+
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS reviews (
                     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -126,6 +180,13 @@ public class DataInitializer implements CommandLineRunner {
                     FOREIGN KEY (product_id) REFERENCES products(id)
                 )
                 """);
+
+        // 4. Schema upgrades
+        addColumnIfMissing("users", "avatar_url", "VARCHAR(500)");
+        addColumnIfMissing("users", "status", "VARCHAR(30) NOT NULL DEFAULT 'ACTIVE'");
+        addColumnIfMissing("users", "ban_until", "TIMESTAMP NULL DEFAULT NULL");
+        addColumnIfMissing("coupons", "max_uses", "INT DEFAULT NULL");
+        addColumnIfMissing("coupons", "used_count", "INT NOT NULL DEFAULT 0");
     }
 
     private void seedData() {

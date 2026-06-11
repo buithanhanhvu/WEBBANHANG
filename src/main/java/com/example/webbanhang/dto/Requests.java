@@ -13,7 +13,21 @@ public final class Requests {
     public record LoginRequest(String usernameOrEmail, String password) {
     }
 
+    public record GoogleLoginRequest(String credential) {
+    }
+
+    public record ForgotPasswordRequest(String email) {
+    }
+
+    public record ResetPasswordRequest(String email, String otp, String newPassword) {
+    }
+
+
+
     public record ProfileRequest(String email, String fullName, String phone, String address, String avatarUrl) {
+    }
+
+    public record ChangePasswordRequest(String currentPassword, String newPassword) {
     }
 
     public record CategoryRequest(String name, String description) {
@@ -26,7 +40,7 @@ public final class Requests {
     public record CartRequest(Long productId, Integer quantity) {
     }
 
-    public record CouponRequest(String code, Integer discountPercent, Boolean active, LocalDate startDate, LocalDate endDate) {
+    public record CouponRequest(String code, Integer discountPercent, Boolean active, LocalDate startDate, LocalDate endDate, Integer maxUses) {
     }
 
     public record CheckoutRequest(String couponCode, String shippingName, String shippingAddress, String shippingPhone, String note) {
