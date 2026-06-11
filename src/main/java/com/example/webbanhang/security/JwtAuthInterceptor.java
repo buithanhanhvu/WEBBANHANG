@@ -98,6 +98,7 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
             if (path.matches("/api/products/\\d+/reviews")) return true;
             if (path.matches("/api/products/\\d+/price-history")) return true;
             if (path.equals("/api/categories") || path.matches("/api/categories/\\d+")) return true;
+            if (path.equals("/api/ranks")) return true;
         }
 
         return false;

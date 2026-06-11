@@ -14,9 +14,11 @@ import java.util.Map;
 @Service
 public class CatalogService {
     private final JdbcTemplate jdbc;
+    private final RecycleBinService recycleBinService;
 
-    public CatalogService(JdbcTemplate jdbc) {
+    public CatalogService(JdbcTemplate jdbc, RecycleBinService recycleBinService) {
         this.jdbc = jdbc;
+        this.recycleBinService = recycleBinService;
     }
 
     public List<Map<String, Object>> categories() {
@@ -41,7 +43,11 @@ public class CatalogService {
     }
 
     public void deleteCategory(long id) {
-        category(id);
+        Map<String, Object> cat = category(id);
+        List<Long> productIds = jdbc.queryForList("SELECT id FROM products WHERE category_id = ?", Long.class, id);
+        Map<String, Object> catBackup = new java.util.HashMap<>(cat);
+        catBackup.put("product_ids", productIds);
+        recycleBinService.saveToRecycleBin("CATEGORY", id, (String) cat.get("name"), catBackup);
         jdbc.update("UPDATE products SET category_id = NULL WHERE category_id = ?", id);
         jdbc.update("DELETE FROM categories WHERE id = ?", id);
     }
@@ -138,15 +144,36 @@ public class CatalogService {
     }
 
     public void deleteProduct(long id) {
-        product(id);
+        Map<String, Object> prod = product(id);
+        Integer orderedCount = jdbc.queryForObject("SELECT COUNT(*) FROM order_items WHERE product_id = ?", Integer.class, id);
+        if (orderedCount != null && orderedCount > 0) {
+            throw new BadRequestException("Không thể xóa sản phẩm này vì đã có đơn hàng đặt mua. Hãy cập nhật trạng thái hoặc chỉnh sửa tồn kho về 0 thay vì xóa.");
+        }
+        recycleBinService.saveToRecycleBin("PRODUCT", id, (String) prod.get("name"), prod);
         // Cascade delete tất cả dữ liệu liên quan trước khi xóa sản phẩm
         jdbc.update("DELETE FROM wishlists WHERE product_id=?", id);
         jdbc.update("DELETE FROM price_history WHERE product_id=?", id);
         jdbc.update("DELETE FROM cart_items WHERE product_id=?", id);
         jdbc.update("DELETE FROM reviews WHERE product_id=?", id);
-        jdbc.update("DELETE FROM order_items WHERE product_id=?", id);
         jdbc.update("DELETE FROM products WHERE id=?", id);
     }
+
+    public void bulkUpdateCategory(List<Long> productIds, Long categoryId) {
+        if (productIds == null || productIds.isEmpty()) {
+            return;
+        }
+        if (categoryId != null) {
+            category(categoryId);
+        }
+        String inSql = String.join(",", java.util.Collections.nCopies(productIds.size(), "?"));
+        Object[] args = new Object[productIds.size() + 1];
+        args[0] = categoryId;
+        for (int i = 0; i < productIds.size(); i++) {
+            args[i + 1] = productIds.get(i);
+        }
+        jdbc.update("UPDATE products SET category_id = ? WHERE id IN (" + inSql + ")", args);
+    }
+
 
     private void validateProduct(ProductRequest request) {
         requireText(request.name(), "Product name is required");

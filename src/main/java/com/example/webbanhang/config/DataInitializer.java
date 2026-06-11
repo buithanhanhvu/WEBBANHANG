@@ -181,6 +181,30 @@ public class DataInitializer implements CommandLineRunner {
                 )
                 """);
 
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS ranks (
+                    id VARCHAR(50) PRIMARY KEY,
+                    name VARCHAR(100) NOT NULL,
+                    subtitle VARCHAR(100),
+                    icon VARCHAR(50),
+                    description VARCHAR(500),
+                    min_spent DECIMAL(12,2) NOT NULL,
+                    color VARCHAR(50),
+                    css_class VARCHAR(50)
+                )
+                """);
+
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS recycle_bin (
+                    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                    entity_type VARCHAR(50) NOT NULL,
+                    entity_id BIGINT NOT NULL,
+                    display_name VARCHAR(255) NOT NULL,
+                    original_data TEXT NOT NULL,
+                    deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """);
+
         // 4. Schema upgrades
         addColumnIfMissing("users", "avatar_url", "VARCHAR(500)");
         addColumnIfMissing("users", "status", "VARCHAR(30) NOT NULL DEFAULT 'ACTIVE'");
@@ -221,6 +245,30 @@ public class DataInitializer implements CommandLineRunner {
                     "WELCOME10", 10, true, "2026-01-01", "2026-12-31");
             jdbc.update("INSERT INTO coupons(code,discount_percent,active,start_date,end_date) VALUES(?,?,?,?,?)",
                     "SALE20", 20, true, "2026-01-01", "2026-12-31");
+        }
+
+        Long ranksCount = jdbc.queryForObject("SELECT COUNT(*) FROM ranks", Long.class);
+        if (ranksCount != null && ranksCount == 0) {
+            jdbc.update("INSERT INTO ranks(id, name, subtitle, icon, description, min_spent, color, css_class) VALUES(?,?,?,?,?,?,?,?)",
+                    "shopper", "Shopper", "Người qua đường", "🛍️", "Mới chân ướt chân ráo — mọi hành trình đều bắt đầu từ đây.", 0, "#334155", "rank-shopper");
+            jdbc.update("INSERT INTO ranks(id, name, subtitle, icon, description, min_spent, color, css_class) VALUES(?,?,?,?,?,?,?,?)",
+                    "shark", "Shark", "Cá mập tập sự", "🦈", "Đã bắt đầu chi tiêu mạnh tay — bản năng thị trường đang thức tỉnh.", 500000, "#93c5fd", "rank-shark");
+            jdbc.update("INSERT INTO ranks(id, name, subtitle, icon, description, min_spent, color, css_class) VALUES(?,?,?,?,?,?,?,?)",
+                    "angel", "Angel Investor", "Nhà đầu tư thiên thần", "👼", "Chi tiêu hào phóng, tầm nhìn xa. Những deal tốt không bao giờ bỏ qua.", 2000000, "#c4b5fd", "rank-angel");
+            jdbc.update("INSERT INTO ranks(id, name, subtitle, icon, description, min_spent, color, css_class) VALUES(?,?,?,?,?,?,?,?)",
+                    "unicorn", "Unicorn", "Kỳ lân công nghệ", "🦄", "Hiếm có khó tìm. Danh hiệu lấp lánh dành cho những tâm hồn mua sắm đặc biệt.", 5000000, "#f0abfc", "rank-unicorn");
+            jdbc.update("INSERT INTO ranks(id, name, subtitle, icon, description, min_spent, color, css_class) VALUES(?,?,?,?,?,?,?,?)",
+                    "tycoon", "Tycoon", "Trùm tài phiệt", "💰", "Vàng chảy theo bước chân. Chỉ những tay chi tiêu đẳng cấp mới chạm tới đây.", 15000000, "#fbbf24", "rank-tycoon");
+        }
+
+        // Auto-repair category relationships for orphaned products if category "Dien thoai" (ID=1) exists
+        try {
+            Integer hasPhoneCategory = jdbc.queryForObject("SELECT COUNT(*) FROM categories WHERE id = 1", Integer.class);
+            if (hasPhoneCategory != null && hasPhoneCategory > 0) {
+                jdbc.update("UPDATE products SET category_id = 1 WHERE category_id IS NULL AND (name LIKE '%Phone%' OR name LIKE '%Tai nghe%')");
+            }
+        } catch (Exception e) {
+            // Ignore
         }
     }
 

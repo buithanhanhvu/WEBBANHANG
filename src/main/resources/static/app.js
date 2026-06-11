@@ -91,6 +91,21 @@ function syncAuthUi() {
 
 async function loadBase() {
     state.categories = await api("/api/categories");
+    try {
+        const dbRanks = await api("/api/ranks");
+        if (dbRanks && dbRanks.length > 0) {
+            RANKS = dbRanks.map(r => ({
+                id: r.id,
+                name: r.name,
+                subtitle: r.subtitle,
+                icon: r.icon,
+                desc: r.description,
+                minSpent: Number(r.min_spent || 0),
+                color: r.color,
+                cssClass: r.css_class
+            }));
+        }
+    } catch (_) {}
     $("#categoryFilter").innerHTML = `<option value="">Tất cả danh mục</option>` +
         state.categories.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
     await loadProducts();
@@ -622,7 +637,7 @@ async function openOrder(id) {
             </div>
             <h4 class="items-heading">Sản phẩm đã đặt (${items.length})</h4>
             <div class="order-items">
-                ${items.map(item => `
+                ${items.length ? items.map(item => `
                     <div class="order-item">
                         <img src="${esc(item.imageUrl || "https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?w=300")}"
                              alt="${esc(valueOf(item, "product_name", "productName") || "")}"
@@ -633,7 +648,7 @@ async function openOrder(id) {
                             <span class="muted">Đơn giá: ${money(item.price)} × ${item.quantity}</span>
                         </div>
                         <strong class="order-item-total">${money(Number(item.price) * Number(item.quantity))}</strong>
-                    </div>`).join("")}
+                    </div>`).join("") : `<div style="padding: 16px; text-align: center; color: var(--muted); font-size: 13.5px;">Sản phẩm đã bị xóa khỏi hệ thống</div>`}
             </div>
             <div class="order-summary">
                 <div class="summary-row"><span>Tạm tính</span><span>${money(Number(valueOf(order, "total_amount", "totalAmount")) + Number(valueOf(order, "discount_amount", "discountAmount")))}</span></div>
@@ -774,7 +789,9 @@ async function loadUserStats() {
                     <div class="admin-form-card" style="margin:0; display:flex; flex-direction:column;">
                         <h3>📊 Phân loại chi tiêu</h3>
                         <div style="position:relative; height:240px; width:100%; margin:auto; display:flex; align-items:center; justify-content:center;">
-                            <canvas id="userCategoryChart"></canvas>
+                            ${stats.categorySpending && stats.categorySpending.length > 0 ? 
+                                '<canvas id="userCategoryChart"></canvas>' : 
+                                '<span class="muted" style="font-size:13px;">Chưa có dữ liệu phân loại</span>'}
                         </div>
                     </div>
                     <div class="admin-form-card" style="margin:0; display:flex; flex-direction:column;">
@@ -825,7 +842,7 @@ async function loadUserStats() {
                                     const itemsSummary = (o.items || []).map(i => `${esc(i.name)} x${i.quantity}`).join(", ");
                                     return `<tr>
                                         <td><strong>#${o.id}</strong></td>
-                                        <td style="max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;" title="${esc(itemsSummary)}">${esc(itemsSummary) || "—"}</td>
+                                        <td style="max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;" title="${esc(itemsSummary) || "Sản phẩm đã bị xóa khỏi hệ thống"}">${esc(itemsSummary) || "Sản phẩm đã bị xóa khỏi hệ thống"}</td>
                                         <td style="font-weight:600;color:var(--primary-dark);">${money(o.totalAmount)}</td>
                                         <td><span style="background:${colorMap[o.status] || "#6b7280"}22;color:${colorMap[o.status] || "#6b7280"};padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap;">${statusMap[o.status] || o.status}</span></td>
                                         <td style="font-size:13px;color:var(--muted);white-space:nowrap;">${formatDate(o.createdAt)}</td>
@@ -941,7 +958,7 @@ async function loadAdmin() {
         return;
     }
 
-    const tabTitles = { dashboard: "Thống kê", products: "Sản phẩm", categories: "Danh mục", coupons: "Coupon", orders: "Đơn hàng", users: "Người dùng", stock: "Tồn kho thấp", reports: "Báo cáo doanh thu" };
+    const tabTitles = { dashboard: "Thống kê", products: "Sản phẩm", categories: "Danh mục", coupons: "Coupon", orders: "Đơn hàng", users: "Người dùng", stock: "Tồn kho thấp", reports: "Báo cáo doanh thu", ranks: "Danh hiệu", recycleBin: "Thùng rác" };
     const titleEl = document.getElementById("adminTabTitle");
     if (titleEl) titleEl.textContent = tabTitles[state.adminTab] || "Dashboard";
 
@@ -1044,7 +1061,9 @@ async function renderAdminTab(dashboard) {
                     <div class="admin-form-card" style="margin:0; display:flex; flex-direction:column;">
                         <h3>📊 Doanh thu theo danh mục</h3>
                         <div style="position:relative; height:240px; width:100%; margin:auto; display:flex; align-items:center; justify-content:center;">
-                            <canvas id="categoryChart"></canvas>
+                            ${dashboard.categoryRevenue && dashboard.categoryRevenue.length > 0 ? 
+                                '<canvas id="categoryChart"></canvas>' : 
+                                '<span class="muted" style="font-size:13px;">Chưa có dữ liệu doanh thu</span>'}
                         </div>
                     </div>
                     <div class="admin-form-card" style="margin:0; display:flex; flex-direction:column;">
@@ -1079,7 +1098,9 @@ async function renderAdminTab(dashboard) {
                     <div class="admin-form-card" style="margin:0; display:flex; flex-direction:column;">
                         <h3>📝 Trạng thái đơn hàng</h3>
                         <div style="position:relative; height:240px; width:100%; margin:auto; display:flex; align-items:center; justify-content:center;">
-                            <canvas id="orderStatusChart"></canvas>
+                            ${dashboard.orderStatusCounts && dashboard.orderStatusCounts.length > 0 ? 
+                                '<canvas id="orderStatusChart"></canvas>' : 
+                                '<span class="muted" style="font-size:13px;">Chưa có đơn hàng nào</span>'}
                         </div>
                     </div>
                     <div class="admin-form-card" style="margin:0; display:flex; flex-direction:column;">
@@ -1257,14 +1278,30 @@ async function renderAdminTab(dashboard) {
         const end = start + ADMIN_PAGE_SIZE;
         const paginatedProducts = products.slice(start, end);
 
+        const bulkBar = `
+            <div id="bulkCategoryActionWrapper" style="display:none; align-items:center; gap:12px; margin-bottom:16px; padding:16px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:12px; flex-wrap:wrap;">
+                <span style="font-weight:700; color:#166534;" id="bulkSelectedCount">Đã chọn 0 sản phẩm</span>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:13.5px; color:#374151;">Thay đổi danh mục thành:</span>
+                    <select id="bulkCategorySelect" style="width:220px; margin:0; padding:6px 12px; border-radius:8px; border:1px solid #16a34a; font-size:13.5px; outline:none; background:#ffffff;">
+                        <option value="">-- Không có danh mục (—) --</option>
+                        ${state.categories.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join("")}
+                    </select>
+                </div>
+                <button onclick="applyBulkCategory()" class="primary" style="margin:0; min-height:auto; padding:8px 16px; font-size:13.5px; border-radius:8px;">Áp dụng hàng loạt</button>
+            </div>
+        `;
+
         panel.innerHTML = `
             <div class="admin-form-card">
                 <h3>➕ Thêm sản phẩm mới</h3>
                 ${productForm()}
-            </div>` +
+            </div>
+            ${bulkBar}` +
             table(
-                ["Ảnh", "Tên", "Giá", "Kho", "Danh mục", "Nổi bật", "Thao tác"],
+                [`<input type="checkbox" id="selectAllProducts" onclick="toggleSelectAllProducts(this)" style="width:16px;height:16px;margin:0;cursor:pointer;vertical-align:middle;">`, "Ảnh", "Tên", "Giá", "Kho", "Danh mục", "Nổi bật", "Thao tác"],
                 paginatedProducts.map(p => [
+                    `<input type="checkbox" class="product-select-checkbox" data-id="${p.id}" onclick="updateBulkCategoryBar()" style="width:16px;height:16px;margin:0;cursor:pointer;vertical-align:middle;">`,
                     `<img src="${esc(valueOf(p,"image_url","imageUrl")||"")}" style="width:52px;height:44px;object-fit:cover;border-radius:6px;background:#e5e7eb">`,
                     `<strong>${esc(p.name)}</strong>`,
                     money(p.price),
@@ -1279,6 +1316,7 @@ async function renderAdminTab(dashboard) {
             ) +
             paginationControls(total, page, "changeAdminPage");
         document.getElementById("productForm").onsubmit = submitProduct;
+
     }
     if (state.adminTab === "categories") {
         const cats = await api("/api/categories");
@@ -1600,7 +1638,109 @@ async function renderAdminTab(dashboard) {
             panel.innerHTML = `<div style="margin:24px;padding:20px;background:#fef2f2;border:1px solid #fecaca;border-radius:12px;color:#b42318"><strong>Lỗi tải báo cáo:</strong> ${err.message}</div>`;
         }
     }
+    if (state.adminTab === "ranks") {
+        panel.innerHTML = `
+            <div class="admin-form-card" style="margin:0 0 16px 0;">
+                <h3>🛡️ Quản lý danh hiệu tích lũy</h3>
+                <p class="hint">Cập nhật số tiền tích lũy tối thiểu (minSpent) để đạt được các mốc danh hiệu.</p>
+            </div>
+            ` + table(
+                ["Huy hiệu", "Tên danh hiệu", "Danh hiệu phụ", "Mức chi tiêu tối thiểu", "Thao tác"],
+                RANKS.map(r => [
+                    `<span style="font-size:24px;">${esc(r.icon)}</span>`,
+                    `<strong>${esc(r.name)}</strong>`,
+                    `<span class="muted">${esc(r.subtitle)}</span>`,
+                    `<span style="font-weight:700; color:var(--primary-dark);">${money(r.minSpent)}</span>`,
+                    `<div style="display:flex;gap:6px">
+                        <button onclick="openEditRank('${r.id}', '${esc(r.name)}', ${r.minSpent})" style="background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8;padding:4px 8px;font-size:12px;font-weight:600;">Sửa mức tiền</button>
+                    </div>`
+                ])
+            );
+    }
+    if (state.adminTab === "recycleBin") {
+        panel.innerHTML = `
+            <div class="admin-form-card" style="margin:0 0 16px 0;">
+                <h3>♻️ Thùng rác hệ thống</h3>
+                <p class="muted" style="font-size:13.5px;margin-bottom:12px;">Nơi lưu trữ tạm thời các mục dữ liệu đã xóa. Bạn có thể khôi phục chúng về trạng thái ban đầu bất kỳ lúc nào.</p>
+                
+                <!-- Search & Filter Controls -->
+                <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:8px;">
+                    <div style="flex:1; min-width:200px;">
+                        <input type="text" id="recycleSearchInput" placeholder="Tìm kiếm theo tên hoặc ID..." oninput="filterRecycleBin()" style="margin:0; padding:8px 12px; font-size:13.5px; border-radius:8px;">
+                    </div>
+                    <div style="width:180px;">
+                        <select id="recycleTypeFilter" onchange="filterRecycleBin()" style="margin:0; padding:8px 12px; font-size:13.5px; border-radius:8px;">
+                            <option value="">Tất cả loại mục</option>
+                            <option value="PRODUCT">Sản phẩm</option>
+                            <option value="USER">Người dùng</option>
+                            <option value="CATEGORY">Danh mục</option>
+                            <option value="COUPON">Coupon</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div id="recycleBinTableWrapper"></div>
+        `;
+        
+        state.recycleBinItems = await api("/api/admin/recycle-bin");
+        filterRecycleBin();
+    }
 }
+
+window.filterRecycleBin = function() {
+    const searchVal = document.getElementById("recycleSearchInput")?.value.trim().toLowerCase() || "";
+    const typeVal = document.getElementById("recycleTypeFilter")?.value || "";
+    
+    const filtered = (state.recycleBinItems || []).filter(item => {
+        const matchesSearch = String(item.display_name || "").toLowerCase().includes(searchVal) || String(item.entity_id || "").includes(searchVal);
+        const matchesType = !typeVal || item.entity_type === typeVal;
+        return matchesSearch && matchesType;
+    });
+    
+    const typeLabels = { USER: "Người dùng", PRODUCT: "Sản phẩm", CATEGORY: "Danh mục", COUPON: "Coupon" };
+    const wrapper = document.getElementById("recycleBinTableWrapper");
+    if (!wrapper) return;
+    
+    if (filtered.length > 0) {
+        wrapper.innerHTML = table(
+            ["Loại mục", "Tên hiển thị", "Mã gốc (ID)", "Ngày xóa", "Thao tác"],
+            filtered.map(item => [
+                `<span class="badge" style="background:#f1f5f9;color:#475569;font-weight:600;padding:4px 8px;border-radius:6px;font-size:12.5px;">${typeLabels[item.entity_type] || item.entity_type}</span>`,
+                `<strong>${esc(item.display_name)}</strong>`,
+                `#${item.entity_id}`,
+                formatDate(item.deleted_at),
+                `<div style="display:flex;gap:6px">
+                    <button onclick="restoreRecycleItem(${item.id})" style="background:#ecfdf3;border-color:#bbf7d0;color:#027a48;font-weight:600;font-size:12.5px;padding:4px 10px;min-height:auto;">Khôi phục</button>
+                    <button onclick="deleteRecycleItemPermanently(${item.id})" style="background:#fef2f2;border-color:#fecaca;color:#b42318;font-size:12.5px;padding:4px 10px;min-height:auto;">Xóa vĩnh viễn</button>
+                </div>`
+            ])
+        );
+    } else {
+        wrapper.innerHTML = `<div style="padding:48px 20px;text-align:center;color:var(--muted);background:var(--panel);border-radius:12px;border:1px solid var(--line);font-size:14px;font-weight:600;">Không tìm thấy mục dữ liệu nào phù hợp.</div>`;
+    }
+};
+
+window.restoreRecycleItem = async function(id) {
+    try {
+        await api(`/api/admin/recycle-bin/${id}/restore`, { method: "POST" });
+        toast("Đã khôi phục dữ liệu thành công!");
+        await loadBase();
+        await loadAdmin();
+    } catch (err) {
+        toast(err.message);
+    }
+};
+
+window.deleteRecycleItemPermanently = async function(id) {
+    if (!confirm("Bạn có chắc chắn muốn xóa vĩnh viễn mục này? Hành động này không thể hoàn tác.")) return;
+    try {
+        await api(`/api/admin/recycle-bin/${id}`, { method: "DELETE" });
+        toast("Đã xóa vĩnh viễn khỏi hệ thống!");
+        await loadAdmin();
+    } catch (err) {
+        toast(err.message);
+    }
+};
 
 function productForm() {
     return `
@@ -2469,7 +2609,7 @@ document.getElementById("avatarFileInput").addEventListener("change", async (e) 
 // HỆ THỐNG DANH HIỆU - RANK SYSTEM
 // ============================================================
 
-const RANKS = [
+let RANKS = [
     {
         id: "shopper",
         name: "Shopper",
@@ -2580,6 +2720,19 @@ function renderGoldParticles() {
     return html;
 }
 
+window.showRankInfo = function(name, minSpent, desc) {
+    const detailEl = document.getElementById("rankTierDetail");
+    if (detailEl) {
+        detailEl.innerHTML = `
+            <div style="border-top: 1px dashed; border-color: inherit; opacity: 0.25; margin-top: 12px;"></div>
+            <div style="margin-top: 10px; font-size: 12.5px; line-height: 1.4;">
+                <span style="font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; font-size: 11px; display: inline-block; margin-right: 6px;">★ ${name}</span> 
+                · Yêu cầu tích lũy từ <strong>${money(minSpent)}</strong>
+                <p style="margin: 4px 0 0; opacity: 0.75; font-size: 11.5px; font-weight: normal;">${desc}</p>
+            </div>`;
+    }
+};
+
 function renderRankCard(totalSpent) {
     const { rank, pct, nextName, needed } = getRankProgress(totalSpent);
     const isTycoon   = rank.id === "tycoon";
@@ -2596,7 +2749,7 @@ function renderRankCard(totalSpent) {
     const tierPips = RANKS.map(r => {
         const current  = r.id === rank.id;
         const unlocked = totalSpent >= r.minSpent;
-        return `<span class="rank-tier-pip ${current ? "current" : ""} ${unlocked && !current ? "unlocked" : ""}">
+        return `<span class="rank-tier-pip ${current ? "current" : ""} ${unlocked && !current ? "unlocked" : ""}" onclick="showRankInfo('${esc(r.name)}', ${r.minSpent}, '${esc(r.desc)}')">
             ${r.icon} ${r.name}
         </span>`;
     }).join("");
@@ -2622,6 +2775,7 @@ function renderRankCard(totalSpent) {
             </div>
             <span class="rank-next-hint">${nextHint}</span>
             <div class="rank-all-tiers">${tierPips}</div>
+            <div id="rankTierDetail" style="transition: all 0.2s ease;"></div>
         </div>
         <div class="rank-spent-wrap">
             <span class="rank-spent-value">${money(totalSpent)}</span>
@@ -2650,6 +2804,10 @@ async function loadRankCard() {
     // Reset classes, áp đúng tier class
     rankCardEl.className = "rank-card " + cssClass;
     rankCardEl.innerHTML = html;
+
+    // Hiển thị sẵn danh hiệu hiện tại của user dưới card
+    const currentRank = getRank(totalSpent);
+    showRankInfo(currentRank.name, currentRank.minSpent, currentRank.desc);
 
     // Animate XP bar
     requestAnimationFrame(() => {
@@ -3117,4 +3275,100 @@ window.toggleUserStatusPrompt = function(userId) {
     toggleUserStatus(userId, "BANNED", days);
 };
 
+window.openEditRank = function(id, name, minSpent) {
+    document.getElementById("editRankModal")?.remove();
+    const modal = document.createElement("dialog");
+    modal.id = "editRankModal";
+    modal.style.cssText = "width:min(400px,calc(100vw - 24px));border:1px solid var(--line);border-radius:12px;padding:0;box-shadow:var(--shadow)";
+    modal.innerHTML = `
+        <form id="editRankForm" class="form dialog-form" style="padding:20px;display:grid;gap:12px">
+            <div class="section-head" style="margin-bottom:4px">
+                <h3 style="margin:0">Sửa mức chi tiêu</h3>
+                <button type="button" onclick="document.getElementById('editRankModal').close()">✕</button>
+            </div>
+            <p>Điều chỉnh mức tiền tối thiểu để đạt danh hiệu <strong>${name}</strong></p>
+            <input name="minSpent" type="number" min="0" placeholder="Mức chi tiêu tối thiểu" value="${minSpent}" required>
+            <div style="display:flex;gap:10px;justify-content:flex-end">
+                <button type="button" onclick="document.getElementById('editRankModal').close()">Hủy</button>
+                <button type="submit" class="primary">Lưu</button>
+            </div>
+        </form>`;
+    document.body.appendChild(modal);
+    modal.showModal();
+    document.getElementById("editRankForm").onsubmit = async (e) => {
+        e.preventDefault();
+        const form = new FormData(e.target);
+        const newMinSpent = form.get("minSpent");
+        try {
+            await api(`/api/admin/ranks/${id}`, {
+                method: "PUT",
+                body: JSON.stringify({ minSpent: Number(newMinSpent) })
+            });
+            modal.close();
+            toast("Đã cập nhật mức chi tiêu thành công!");
+            await loadBase();
+            await loadAdmin();
+        } catch (err) {
+            toast(err.message);
+        }
+    };
+};
+window.toggleSelectAllProducts = function(masterCheckbox) {
+    const checkboxes = document.querySelectorAll(".product-select-checkbox");
+    checkboxes.forEach(cb => cb.checked = masterCheckbox.checked);
+    window.updateBulkCategoryBar();
+};
+
+window.updateBulkCategoryBar = function() {
+    const checkboxes = document.querySelectorAll(".product-select-checkbox");
+    const selected = Array.from(checkboxes).filter(cb => cb.checked);
+    const wrapper = document.getElementById("bulkCategoryActionWrapper");
+    const countEl = document.getElementById("bulkSelectedCount");
+    const masterCheckbox = document.getElementById("selectAllProducts");
+
+    if (masterCheckbox) {
+        masterCheckbox.checked = checkboxes.length > 0 && selected.length === checkboxes.length;
+    }
+
+    if (wrapper && countEl) {
+        if (selected.length > 0) {
+            wrapper.style.display = "flex";
+            countEl.textContent = `Đã chọn ${selected.length} sản phẩm`;
+        } else {
+            wrapper.style.display = "none";
+        }
+    }
+};
+
+window.applyBulkCategory = async function() {
+    const checkboxes = document.querySelectorAll(".product-select-checkbox");
+    const selectedIds = Array.from(checkboxes)
+        .filter(cb => cb.checked)
+        .map(cb => Number(cb.dataset.id));
+    
+    if (selectedIds.length === 0) {
+        toast("Vui lòng chọn ít nhất một sản phẩm");
+        return;
+    }
+    
+    const catSelect = document.getElementById("bulkCategorySelect");
+    const categoryIdVal = catSelect ? catSelect.value : "";
+    const categoryId = categoryIdVal ? Number(categoryIdVal) : null;
+    
+    try {
+        await api("/api/admin/products/bulk-category", {
+            method: "PUT",
+            body: JSON.stringify({
+                productIds: selectedIds,
+                categoryId: categoryId
+            })
+        });
+        toast("Đã cập nhật danh mục hàng loạt thành công");
+        await loadAdmin();
+    } catch (err) {
+        toast(err.message);
+    }
+};
+
 loadBase().catch(error => toast(error.message));
+

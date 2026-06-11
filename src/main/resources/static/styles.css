@@ -1904,8 +1904,15 @@ dialog {
     border: 1px solid rgba(255,255,255,.12);
     background: rgba(255,255,255,.05);
     opacity: .5;
-    transition: opacity .2s ease;
+    transition: opacity .2s ease, transform .15s ease, background-color .15s ease;
     white-space: nowrap;
+    cursor: pointer;
+}
+
+.rank-tier-pip:hover {
+    opacity: 0.95;
+    background: rgba(255,255,255,0.12);
+    transform: scale(1.05);
 }
 
 .rank-tier-pip.current {

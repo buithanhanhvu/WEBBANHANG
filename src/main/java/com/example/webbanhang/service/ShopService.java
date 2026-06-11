@@ -21,10 +21,12 @@ import java.util.Map;
 @Service
 public class ShopService {
     private final JdbcTemplate jdbc;
+    private final RecycleBinService recycleBinService;
     private RealtimeService realtimeService;
 
-    public ShopService(JdbcTemplate jdbc) {
+    public ShopService(JdbcTemplate jdbc, RecycleBinService recycleBinService) {
         this.jdbc = jdbc;
+        this.recycleBinService = recycleBinService;
     }
 
     // Setter injection để tránh circular dependency
@@ -116,9 +118,9 @@ public class ShopService {
 
     @org.springframework.transaction.annotation.Transactional
     public void deleteCoupon(long id) {
-        couponById(id);
+        Map<String, Object> coupon = couponById(id);
+        recycleBinService.saveToRecycleBin("COUPON", id, (String) coupon.get("code"), coupon);
         jdbc.update("DELETE FROM user_coupons WHERE coupon_id=?", id);
-        jdbc.update("UPDATE orders SET coupon_id=NULL WHERE coupon_id=?", id);
         jdbc.update("DELETE FROM coupons WHERE id=?", id);
     }
 
@@ -224,9 +226,9 @@ public class ShopService {
                 ? one("SELECT o.*, u.username, u.email FROM orders o JOIN users u ON u.id=o.user_id WHERE o.id=?", orderId)
                 : one("SELECT * FROM orders WHERE id=? AND user_id=?", orderId, userId);
         order.put("items", jdbc.queryForList("""
-                SELECT oi.*, p.image_url imageUrl, p.description productDescription
+                SELECT oi.*, COALESCE(p.image_url, '') imageUrl, COALESCE(p.description, '') productDescription
                 FROM order_items oi
-                JOIN products p ON p.id=oi.product_id
+                LEFT JOIN products p ON p.id=oi.product_id
                 WHERE oi.order_id=?
                 ORDER BY oi.id
                 """, orderId));
@@ -474,19 +476,21 @@ public class ShopService {
 
     public void deleteUser(long id) {
         // Không cho xóa admin
-        List<Map<String, Object>> rows = jdbc.queryForList("SELECT role FROM users WHERE id=?", id);
-        if (rows.isEmpty()) throw new com.example.webbanhang.exception.ResourceNotFoundException("User not found");
-        if ("ADMIN".equals(rows.get(0).get("role"))) {
+        Map<String, Object> u = one("SELECT * FROM users WHERE id=?", id);
+        if ("ADMIN".equals(u.get("role"))) {
             throw new com.example.webbanhang.exception.BadRequestException("Cannot delete admin account");
         }
+        // Kiểm tra xem user đã có đơn hàng chưa
+        Integer orderCount = jdbc.queryForObject("SELECT COUNT(*) FROM orders WHERE user_id = ?", Integer.class, id);
+        if (orderCount != null && orderCount > 0) {
+            throw new BadRequestException("Không thể xóa người dùng này vì họ đã có lịch sử đặt hàng. Vui lòng chuyển trạng thái tài khoản sang BANNED thay vì xóa.");
+        }
+        recycleBinService.saveToRecycleBin("USER", id, (String) u.get("username"), u);
         // Cascade delete tất cả dữ liệu liên quan
         jdbc.update("DELETE FROM wishlists WHERE user_id=?", id);
         jdbc.update("DELETE FROM user_coupons WHERE user_id=?", id);
         jdbc.update("DELETE FROM cart_items WHERE user_id=?", id);
         jdbc.update("DELETE FROM reviews WHERE user_id=?", id);
-        // Xóa order_items qua join orders
-        jdbc.update("DELETE oi FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE o.user_id=?", id);
-        jdbc.update("DELETE FROM orders WHERE user_id=?", id);
         jdbc.update("DELETE FROM users WHERE id=?", id);
     }
 
@@ -553,28 +557,28 @@ public class ShopService {
         }
 
         // ── Category Revenue distribution ──
-        String catRevSql = "SELECT c.name as label, COALESCE(SUM(oi.price * oi.quantity),0) as value " +
+        String catRevSql = "SELECT COALESCE(c.name, 'Khác') as label, COALESCE(SUM(oi.price * oi.quantity),0) as value " +
                            "FROM order_items oi " +
-                           "JOIN products p ON oi.product_id = p.id " +
-                           "JOIN categories c ON p.category_id = c.id " +
+                           "LEFT JOIN products p ON oi.product_id = p.id " +
+                           "LEFT JOIN categories c ON p.category_id = c.id " +
                            "JOIN orders o ON oi.order_id = o.id " +
                            "WHERE o.status <> 'CANCELLED' ";
         if (start != null) {
-            result.put("categoryRevenue", jdbc.queryForList(catRevSql + "AND o.created_at >= ? GROUP BY c.name ORDER BY value DESC", start));
+            result.put("categoryRevenue", jdbc.queryForList(catRevSql + "AND o.created_at >= ? GROUP BY COALESCE(c.name, 'Khác') ORDER BY value DESC", start));
         } else {
-            result.put("categoryRevenue", jdbc.queryForList(catRevSql + "GROUP BY c.name ORDER BY value DESC"));
+            result.put("categoryRevenue", jdbc.queryForList(catRevSql + "GROUP BY COALESCE(c.name, 'Khác') ORDER BY value DESC"));
         }
 
         // ── Top Products ──
-        String topProdSql = "SELECT p.id, p.name, p.image_url as imageUrl, COALESCE(SUM(oi.quantity),0) as quantitySold, COALESCE(SUM(oi.price * oi.quantity),0) as revenue " +
+        String topProdSql = "SELECT oi.product_id as id, COALESCE(p.name, oi.product_name, CONCAT('Sản phẩm #', oi.product_id)) as name, p.image_url as imageUrl, COALESCE(SUM(oi.quantity),0) as quantitySold, COALESCE(SUM(oi.price * oi.quantity),0) as revenue " +
                             "FROM order_items oi " +
-                            "JOIN products p ON oi.product_id = p.id " +
+                            "LEFT JOIN products p ON oi.product_id = p.id " +
                             "JOIN orders o ON oi.order_id = o.id " +
                             "WHERE o.status <> 'CANCELLED' ";
         if (start != null) {
-            result.put("topProducts", jdbc.queryForList(topProdSql + "AND o.created_at >= ? GROUP BY p.id, p.name, p.image_url ORDER BY quantitySold DESC LIMIT 10", start));
+            result.put("topProducts", jdbc.queryForList(topProdSql + "AND o.created_at >= ? GROUP BY oi.product_id, p.name, oi.product_name, p.image_url ORDER BY quantitySold DESC LIMIT 10", start));
         } else {
-            result.put("topProducts", jdbc.queryForList(topProdSql + "GROUP BY p.id, p.name, p.image_url ORDER BY quantitySold DESC LIMIT 10"));
+            result.put("topProducts", jdbc.queryForList(topProdSql + "GROUP BY oi.product_id, p.name, oi.product_name, p.image_url ORDER BY quantitySold DESC LIMIT 10"));
         }
 
         // ── Revenue Chart Data ──
@@ -726,28 +730,28 @@ public class ShopService {
         result.put("monthlySpending", monthlySpending);
 
         // 3. Spending by Category (filtered by period)
-        String catSql = "SELECT c.name as label, COALESCE(SUM(oi.price * oi.quantity),0) as value " +
+        String catSql = "SELECT COALESCE(c.name, 'Khác') as label, COALESCE(SUM(oi.price * oi.quantity),0) as value " +
                          "FROM order_items oi " +
-                         "JOIN products p ON oi.product_id = p.id " +
-                         "JOIN categories c ON p.category_id = c.id " +
+                         "LEFT JOIN products p ON oi.product_id = p.id " +
+                         "LEFT JOIN categories c ON p.category_id = c.id " +
                          "JOIN orders o ON oi.order_id = o.id " +
                          "WHERE o.user_id=? AND o.status <> 'CANCELLED' ";
         if (periodStart != null) {
-            result.put("categorySpending", jdbc.queryForList(catSql + "AND o.created_at >= ? GROUP BY c.name ORDER BY value DESC", userId, periodStart));
+            result.put("categorySpending", jdbc.queryForList(catSql + "AND o.created_at >= ? GROUP BY COALESCE(c.name, 'Khác') ORDER BY value DESC", userId, periodStart));
         } else {
-            result.put("categorySpending", jdbc.queryForList(catSql + "GROUP BY c.name ORDER BY value DESC", userId));
+            result.put("categorySpending", jdbc.queryForList(catSql + "GROUP BY COALESCE(c.name, 'Khác') ORDER BY value DESC", userId));
         }
 
         // 4. Top purchased products (filtered by period)
-        String topProdSql = "SELECT p.id, p.name, p.image_url as imageUrl, COALESCE(SUM(oi.quantity),0) as quantity, COALESCE(SUM(oi.price * oi.quantity),0) as totalSpent " +
+        String topProdSql = "SELECT oi.product_id as id, COALESCE(p.name, oi.product_name, CONCAT('Sản phẩm #', oi.product_id)) as name, p.image_url as imageUrl, COALESCE(SUM(oi.quantity),0) as quantity, COALESCE(SUM(oi.price * oi.quantity),0) as totalSpent " +
                             "FROM order_items oi " +
-                            "JOIN products p ON oi.product_id = p.id " +
+                            "LEFT JOIN products p ON oi.product_id = p.id " +
                             "JOIN orders o ON oi.order_id = o.id " +
                             "WHERE o.user_id=? AND o.status <> 'CANCELLED' ";
         if (periodStart != null) {
-            result.put("topProducts", jdbc.queryForList(topProdSql + "AND o.created_at >= ? GROUP BY p.id, p.name, p.image_url ORDER BY quantity DESC LIMIT 5", userId, periodStart));
+            result.put("topProducts", jdbc.queryForList(topProdSql + "AND o.created_at >= ? GROUP BY oi.product_id, p.name, oi.product_name, p.image_url ORDER BY quantity DESC LIMIT 5", userId, periodStart));
         } else {
-            result.put("topProducts", jdbc.queryForList(topProdSql + "GROUP BY p.id, p.name, p.image_url ORDER BY quantity DESC LIMIT 5", userId));
+            result.put("topProducts", jdbc.queryForList(topProdSql + "GROUP BY oi.product_id, p.name, oi.product_name, p.image_url ORDER BY quantity DESC LIMIT 5", userId));
         }
 
         // 5. Daily spending chart data (for selected period)
@@ -804,8 +808,8 @@ public class ShopService {
         for (Map<String, Object> order : orders) {
             long orderId = ((Number) order.get("id")).longValue();
             List<Map<String, Object>> items = jdbc.queryForList(
-                "SELECT oi.quantity, oi.price, p.name, p.image_url as imageUrl " +
-                "FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id=?",
+                "SELECT oi.quantity, oi.price, COALESCE(oi.product_name, p.name, CONCAT('Sản phẩm #', oi.product_id)) as name, p.image_url as imageUrl " +
+                "FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id=?",
                 orderId
             );
             order.put("items", items);
@@ -903,13 +907,13 @@ public class ShopService {
         }
 
         // 5. Top selling products in period
-        String topProdSql = "SELECT p.id, p.name, p.image_url as imageUrl, COALESCE(SUM(oi.quantity),0) as quantitySold, COALESCE(SUM(oi.price * oi.quantity),0) as revenue " +
-                            "FROM order_items oi JOIN products p ON oi.product_id = p.id " +
+        String topProdSql = "SELECT oi.product_id as id, COALESCE(p.name, oi.product_name, CONCAT('Sản phẩm #', oi.product_id)) as name, p.image_url as imageUrl, COALESCE(SUM(oi.quantity),0) as quantitySold, COALESCE(SUM(oi.price * oi.quantity),0) as revenue " +
+                            "FROM order_items oi LEFT JOIN products p ON oi.product_id = p.id " +
                             "JOIN orders o ON oi.order_id = o.id WHERE o.status <> 'CANCELLED' ";
         if (periodStart != null) {
-            result.put("topProducts", jdbc.queryForList(topProdSql + "AND o.created_at >= ? GROUP BY p.id, p.name, p.image_url ORDER BY quantitySold DESC LIMIT 10", periodStart));
+            result.put("topProducts", jdbc.queryForList(topProdSql + "AND o.created_at >= ? GROUP BY oi.product_id, p.name, oi.product_name, p.image_url ORDER BY quantitySold DESC LIMIT 10", periodStart));
         } else {
-            result.put("topProducts", jdbc.queryForList(topProdSql + "GROUP BY p.id, p.name, p.image_url ORDER BY quantitySold DESC LIMIT 10"));
+            result.put("topProducts", jdbc.queryForList(topProdSql + "GROUP BY oi.product_id, p.name, oi.product_name, p.image_url ORDER BY quantitySold DESC LIMIT 10"));
         }
 
         return result;
@@ -928,5 +932,16 @@ public class ShopService {
             return java.time.LocalDate.now().withDayOfYear(1).atStartOfDay();
         }
         return null; // "all"
+    }
+
+    public List<Map<String, Object>> getRanks() {
+        return jdbc.queryForList("SELECT * FROM ranks ORDER BY min_spent ASC");
+    }
+
+    public void updateRankMinSpent(String id, java.math.BigDecimal minSpent) {
+        if (minSpent == null || minSpent.compareTo(java.math.BigDecimal.ZERO) < 0) {
+            throw new BadRequestException("Số tiền tích lũy tối thiểu không được âm");
+        }
+        jdbc.update("UPDATE ranks SET min_spent = ? WHERE id = ?", minSpent, id);
     }
 }

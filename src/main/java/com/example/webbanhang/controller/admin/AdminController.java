@@ -9,6 +9,7 @@ import com.example.webbanhang.security.CurrentUserService;
 import com.example.webbanhang.service.CatalogService;
 import com.example.webbanhang.service.RealtimeService;
 import com.example.webbanhang.service.ShopService;
+import com.example.webbanhang.service.RecycleBinService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,13 +23,16 @@ public class AdminController {
     private final ShopService shopService;
     private final CurrentUserService currentUserService;
     private final RealtimeService realtimeService;
+    private final RecycleBinService recycleBinService;
 
     public AdminController(CatalogService catalogService, ShopService shopService,
-                           CurrentUserService currentUserService, RealtimeService realtimeService) {
+                           CurrentUserService currentUserService, RealtimeService realtimeService,
+                           RecycleBinService recycleBinService) {
         this.catalogService = catalogService;
         this.shopService = shopService;
         this.currentUserService = currentUserService;
         this.realtimeService = realtimeService;
+        this.recycleBinService = recycleBinService;
     }
 
     @GetMapping("/dashboard")
@@ -88,6 +92,25 @@ public class AdminController {
         realtimeService.productChanged("deleted", Map.of("id", id));
         return ApiResponse.ok("Deleted", null);
     }
+
+    @PutMapping("/products/bulk-category")
+    public ApiResponse<Void> bulkUpdateCategory(@RequestBody Map<String, Object> body, HttpServletRequest request) {
+        currentUserService.requireAdmin(request);
+        List<?> rawIds = (List<?>) body.get("productIds");
+        if (rawIds == null) {
+            throw new com.example.webbanhang.exception.BadRequestException("Danh sách sản phẩm không hợp lệ");
+        }
+        List<Long> productIds = rawIds.stream()
+                .map(x -> ((Number) x).longValue())
+                .collect(java.util.stream.Collectors.toList());
+        Long categoryId = body.get("categoryId") != null ? ((Number) body.get("categoryId")).longValue() : null;
+        catalogService.bulkUpdateCategory(productIds, categoryId);
+        if (realtimeService != null) {
+            realtimeService.productChanged("updated", Map.of());
+        }
+        return ApiResponse.ok("Cập nhật danh mục hàng loạt thành công", null);
+    }
+
 
     // ── Coupons ──
 
@@ -171,5 +194,38 @@ public class AdminController {
             HttpServletRequest request) {
         currentUserService.requireAdmin(request);
         return ApiResponse.ok(shopService.getAdminRevenueReport(period));
+    }
+
+    @PutMapping("/ranks/{id}")
+    public ApiResponse<Void> updateRank(@PathVariable String id, @RequestBody Map<String, Object> body, HttpServletRequest request) {
+        currentUserService.requireAdmin(request);
+        java.math.BigDecimal minSpent = new java.math.BigDecimal(String.valueOf(body.get("minSpent")));
+        shopService.updateRankMinSpent(id, minSpent);
+        return ApiResponse.ok("Updated", null);
+    }
+
+    // ── Recycle Bin ──
+
+    @GetMapping("/recycle-bin")
+    public ApiResponse<List<Map<String, Object>>> getRecycleBin(HttpServletRequest request) {
+        currentUserService.requireAdmin(request);
+        return ApiResponse.ok(recycleBinService.getRecycleBinItems());
+    }
+
+    @PostMapping("/recycle-bin/{id}/restore")
+    public ApiResponse<Void> restoreItem(@PathVariable long id, HttpServletRequest request) {
+        currentUserService.requireAdmin(request);
+        recycleBinService.restoreItem(id);
+        if (realtimeService != null) {
+            realtimeService.productChanged("created", Map.of());
+        }
+        return ApiResponse.ok("Khôi phục thành công", null);
+    }
+
+    @DeleteMapping("/recycle-bin/{id}")
+    public ApiResponse<Void> deletePermanently(@PathVariable long id, HttpServletRequest request) {
+        currentUserService.requireAdmin(request);
+        recycleBinService.deletePermanently(id);
+        return ApiResponse.ok("Xóa vĩnh viễn thành công", null);
     }
 }

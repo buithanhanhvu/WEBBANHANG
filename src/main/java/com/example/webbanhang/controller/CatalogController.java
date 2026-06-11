@@ -55,4 +55,9 @@ public class CatalogController {
     public ApiResponse<List<Map<String, Object>>> priceHistory(@PathVariable long id) {
         return ApiResponse.ok(catalogService.priceHistory(id));
     }
+
+    @GetMapping("/ranks")
+    public ApiResponse<List<Map<String, Object>>> ranks() {
+        return ApiResponse.ok(shopService.getRanks());
+    }
 }
