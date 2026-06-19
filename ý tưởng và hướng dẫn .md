@@ -44,7 +44,7 @@ Quản lý coupon
 Quản lý đơn hàng
 Quản lý tồn kho
 
-3. Nên mở rộng để được điểm cao
+1. Nên mở rộng để được điểm cao
 
 Nếu chỉ làm đúng đề thì khá đơn giản.
 
@@ -90,12 +90,12 @@ Tìm kiếm sản phẩm
 5. Phân tích Database
 Bảng User
 users
-Field	Type
-id	bigint
-username	varchar
-email	varchar
-password	varchar
-role	varchar
+Field Type
+id bigint
+username varchar
+email varchar
+password varchar
+role varchar
 Bảng Category
 categories
 Field
@@ -319,6 +319,3 @@ src
 ├── routes
 ├── types
 └── utils
-
-
-Cơ sở dữ liệu dùng Mysql ![thông tin về  local tôi để trong ảnh hãy xem kĩ và xây dựng hệ thống ](image.png)

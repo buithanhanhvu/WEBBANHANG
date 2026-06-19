@@ -1,6 +1,9 @@
 # 🛒 Mini E-Commerce System (Hệ thống Thương mại Điện tử Mini)
 
-Dự án **Mini E-Commerce System** là một hệ thống bán hàng trực tuyến toàn diện, được xây dựng với kiến trúc **Monolithic** tinh gọn. Backend sử dụng **Java 21** và **Spring Boot**, tận dụng tối đa hiệu năng của **Spring JDBC (JdbcTemplate)** để tối ưu hóa truy vấn dữ liệu trực tiếp đến **MySQL** mà không cần qua tầng ORM cồng kềnh. Frontend được xây dựng bằng **HTML5, Vanilla CSS, và Modern JavaScript**, phục vụ trực tiếp (Single-page app-like experience) từ static resource của Spring Boot.
+Dự án **Mini E-Commerce System** là một hệ thống bán hàng trực tuyến toàn diện, được xây dựng với kiến trúc **Monolithic** tinh gọn, hiện đại và chuẩn hóa. 
+
+- **Backend**: Sử dụng **Java 21** và **Spring Boot 4.0.6**, tận dụng sức mạnh của **Spring Data JPA & Hibernate** để quản lý cơ sở dữ liệu **MySQL** một cách an toàn, nhất quán thông qua các cơ chế di chuyển lược đồ tự động với **Flyway**.
+- **Frontend**: Được phát triển bằng **React 18/19 + TypeScript**, sử dụng **Vite** làm công cụ đóng gói siêu tốc, quản lý trạng thái giỏ hàng bằng **Zustand**, gọi API với **Axios**, và xây dựng giao diện đẹp mắt bằng **TailwindCSS (v4)**.
 
 Hệ thống được tích hợp các cơ chế bảo mật cao cấp (JWT, Google OAuth2), các tính năng nâng cao như **Phân hạng thành viên (User Ranking Gamification)**, **Nhận thông báo giảm giá từ Wishlist**, **Thùng rác khôi phục dữ liệu (Recycle Bin)**, **Khóa dòng dữ liệu chống tranh chấp hàng tồn kho (Database Row Locking)**, và **Cập nhật thời gian thực (Realtime WebSockets)**.
 
@@ -8,8 +11,8 @@ Hệ thống được tích hợp các cơ chế bảo mật cao cấp (JWT, Goo
 
 ## 🚀 Điểm Nổi Bật Về Kỹ Thuật (Technical Highlights)
 
-*   **Spring JdbcTemplate & Custom Mapping**: Toàn bộ dữ liệu được truy xuất trực tiếp qua SQL thuần túy bằng `JdbcTemplate`, giúp lập trình viên kiểm soát tuyệt đối hiệu năng câu lệnh SQL, tránh được các vấn đề n+1 query của Hibernate.
-*   **Database Row Locking (`SELECT ... FOR UPDATE`)**: Khi khách hàng tiến hành thanh toán (Checkout), hệ thống sẽ lock các dòng sản phẩm tương ứng trong database để tránh tình trạng race condition khi nhiều luồng thanh toán cùng một sản phẩm cùng lúc.
+*   **Spring Data JPA & Hibernate**: Sử dụng JPA Repository để thao tác dữ liệu an toàn, khai báo quan hệ rõ ràng giữa các thực thể và tận dụng tối đa cơ chế nạp dữ liệu (Lazy/Eager loading) tối ưu.
+*   **Database Row Locking (`SELECT ... FOR UPDATE`)**: Khi khách hàng tiến hành thanh toán (Checkout), hệ thống sẽ lock các dòng sản phẩm tương ứng trong database để tránh tình trạng tranh chấp hàng tồn kho (race condition) khi nhiều luồng thanh toán cùng một sản phẩm cùng lúc.
 *   **Realtime Communication (Spring WebSocket)**: Sử dụng WebSocket (`SimpMessagingTemplate`) để phát sóng thời gian thực (Broadcast) các sự kiện thay đổi tồn kho, tạo đơn hàng mới, cập nhật sản phẩm/danh mục tới tất cả khách hàng đang kết nối.
 *   **Lịch sử biến động giá & Thông báo giảm giá**: Hệ thống tự động ghi lại lịch sử thay đổi giá gốc/giá khuyến mãi của sản phẩm. Khi sản phẩm trong Wishlist của người dùng được giảm giá (trong vòng 7 ngày gần nhất), hệ thống sẽ gửi thông báo giảm giá trực quan.
 *   **Thùng rác hệ thống (Recycle Bin)**: Hỗ trợ xóa mềm (Soft Delete) đối với Sản phẩm, Danh mục, Người dùng, và Mã giảm giá. Dữ liệu bị xóa sẽ được nén dưới dạng JSON lưu vào bảng `recycle_bin` và có khả năng khôi phục (Restore) nguyên trạng hoàn toàn.
@@ -89,43 +92,39 @@ erDiagram
     ranks ||--o{ users : "xác định hạng theo min_spent"
 ```
 
-### Chi tiết các bảng chính:
-1.  **users**: Thông tin người dùng, vai trò (`ADMIN`, `CUSTOMER`), trạng thái (`ACTIVE`, `BANNED`), thời gian khóa (`ban_until`), họ tên, địa chỉ, số điện thoại, link ảnh đại diện.
-2.  **categories**: Tên và mô tả danh mục sản phẩm.
-3.  **products**: Thông tin sản phẩm, giá bán, số lượng tồn kho, phần trăm giảm giá, danh mục liên kết, cờ sản phẩm nổi bật (`featured`).
-4.  **price_history**: Lưu lại giá trị giá gốc cũ/mới và phần trăm giảm giá cũ/mới mỗi khi sản phẩm được cập nhật giá, hỗ trợ tính năng thông báo giảm giá Wishlist.
-5.  **coupons**: Mã giảm giá, phần trăm giảm giá, giới hạn số lần phát hành (`max_uses`), số lần đã sử dụng (`used_count`), thời gian hiệu lực.
-6.  **user_coupons**: Ví voucher của từng người dùng, liên kết n-n giữa `users` và `coupons`.
-7.  **cart_items**: Các sản phẩm đang nằm trong giỏ hàng của khách hàng.
-8.  **wishlists**: Bookmark sản phẩm yêu thích của khách hàng.
-9.  **orders**: Thông tin đơn hàng tổng quát, số tiền thanh toán, số tiền được giảm, trạng thái giao nhận, địa chỉ người nhận.
-10. **order_items**: Chi tiết sản phẩm trong đơn hàng tại thời điểm mua (lưu lại snapshot giá bán và tên sản phẩm lúc thanh toán).
-11. **reviews**: Đánh giá sản phẩm từ người dùng (liên kết duy nhất: một người dùng chỉ đánh giá một sản phẩm tối đa một lần).
-12. **ranks**: Định nghĩa các mốc chi tiêu tối thiểu (`min_spent`), tiêu đề, biểu tượng cảm xúc và màu sắc tương ứng cho từng hạng thành viên.
-13. **recycle_bin**: Lưu dữ liệu sao lưu của các thực thể bị xóa dưới dạng cấu trúc JSON, ghi nhận thời điểm xóa.
-14. **password_resets**: Quản lý OTP khôi phục mật khẩu.
-
 ---
 
 ## 📂 Cấu Trúc Thư Mục Dự Án (Folder Structure)
 
 ```text
 Webbanhang/
-├── src/
+├── frontend/                 # --- DỰ ÁN FRONTEND (React 18 + TS) ---
+│   ├── src/
+│   │   ├── components/       # Các component dùng chung (CartDrawer, ProductCard, FilterSidebar...)
+│   │   ├── pages/            # Các trang giao diện (Home, ProductList, ProductDetail, Checkout, Admin...)
+│   │   ├── services/         # Axios config API kết nối đến Backend
+│   │   ├── store/            # Quản lý State bằng Zustand (useCartStore, useAuthStore)
+│   │   ├── types/            # Định nghĩa Interface TypeScript
+│   │   └── App.tsx           # Router chính (React Router Dom v6)
+│   ├── package.json          # Quản lý thư viện và script chạy
+│   └── vite.config.ts        # Cấu hình Vite & Proxy kết nối API backend
+├── src/                      # --- DỰ ÁN BACKEND (Spring Boot) ---
 │   ├── main/
 │   │   ├── java/com/example/webbanhang/
-│   │   │   ├── common/              # Lớp tiện ích JSONHelper, ApiResponse chung
-│   │   │   ├── config/              # Khởi tạo DB tự động (DataInitializer), WebSocketConfig, WebMvcConfig
-│   │   │   ├── controller/          # Tầng tiếp nhận HTTP Request APIs
-│   │   │   │   └── admin/           # APIs quản trị AdminController
-│   │   │   ├── domain/              # Enums định nghĩa trạng thái đơn hàng và phân quyền
-│   │   │   ├── dto/                 # Lớp định dạng dữ liệu vào/ra (Record Requests/Responses)
-│   │   │   ├── exception/           # Xử lý lỗi tập trung toàn hệ thống (GlobalExceptionHandler)
-│   │   │   ├── security/            # Cấu hình Spring Security, JWT Token Service, Filter xác thực
-│   │   │   └── service/             # Tầng xử lý nghiệp vụ chính (Auth, Catalog, Shop, RecycleBin, Realtime)
+│   │   │   ├── common/       # Lớp tiện ích JSONHelper, ApiResponse chung
+│   │   │   ├── config/       # Flyway, WebSocketConfig, WebMvcConfig
+│   │   │   ├── controller/   # API Controllers (Auth, Catalog, Cart, Upload)
+│   │   │   │   └── admin/    # AdminController quản lý dashboard, CRUD và Recycle Bin
+│   │   │   ├── domain/       # Các Entity JPA (User, Product, Category, Order, CartItem...)
+│   │   │   ├── dto/          # Data Transfer Objects (Requests & Responses)
+│   │   │   ├── exception/    # Tầng bắt lỗi tập trung (GlobalExceptionHandler)
+│   │   │   ├── repository/   # Spring Data JPA Repositories
+│   │   │   ├── security/     # Cấu hình Spring Security, JWT Service, Auth Filters
+│   │   │   └── service/      # Business Logic Services (AuthService, ShopService, CatalogService)
 │   │   └── resources/
-│   │       ├── static/              # Frontend tĩnh (index.html, styles.css, app.js)
-│   │       └── application.properties # Cấu hình môi trường chạy (Cổng mạng, Kết nối DB, JWT Secret...)
+│   │       ├── db/migration/ # Các file SQL migrations của Flyway
+│   │       ├── static/       # Chứa thư mục uploads ảnh và các file build tĩnh của React frontend
+│   │       └── application.properties # Cấu hình ứng dụng (Port, Database URL, JWT Secret...)
 ```
 
 ---
@@ -134,6 +133,7 @@ Webbanhang/
 
 ### 📋 Yêu cầu hệ thống
 *   **Java**: Phiên bản JDK 21 trở lên.
+*   **Node.js**: Phiên bản 18 trở lên (để chạy dev server frontend).
 *   **Maven**: Bản 3.8+ (đã tích hợp sẵn Maven Wrapper trong dự án làm công cụ chạy tiện lợi).
 *   **Database**: MySQL Server 8.0 trở lên.
 
@@ -142,49 +142,45 @@ Webbanhang/
 #### Bước 1: Chuẩn bị Cơ sở dữ liệu MySQL
 1. Khởi động MySQL Server của bạn.
 2. Đảm bảo cổng hoạt động mặc định là `3306`.
-3. Hệ thống hỗ trợ **tự động tạo database** `webbanhang` nếu nó chưa tồn tại khi ứng dụng khởi chạy lần đầu (yêu cầu tài khoản MySQL có quyền `CREATE DATABASE`). Bạn cũng có thể tạo tay bằng lệnh:
+3. Tạo cơ sở dữ liệu `webbanhang` bằng lệnh:
    ```sql
    CREATE DATABASE webbanhang CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
    ```
 
-#### Bước 2: Chạy ứng dụng Spring Boot
+#### Bước 2: Chạy Frontend ở chế độ Development (Local Dev)
+1. Di chuyển vào thư mục frontend:
+   ```bash
+   cd frontend
+   ```
+2. Cài đặt các thư viện phụ thuộc:
+   ```bash
+   npm install
+   ```
+3. Khởi chạy Vite dev server (chạy trên cổng `3000`, tự động proxy sang backend cổng `8080`):
+   ```bash
+   npm run dev
+   ```
 
-*   **Trường hợp 1: Tài khoản MySQL `root` không đặt mật khẩu hoặc dùng mật khẩu mặc định của dự án (`123456`)**:
-    Mở Terminal tại thư mục gốc của dự án và chạy trực tiếp lệnh:
-    ```powershell
-    # Trên Windows (PowerShell)
-    .\mvnw.cmd spring-boot:run
-    
-    # Trên Linux / macOS
-    ./mvnw spring-boot:run
-    ```
-
-*   **Trường hợp 2: Tài khoản MySQL có mật khẩu riêng hoặc địa chỉ IP khác**:
-    Hãy cung cấp mật khẩu hoặc các tham số cấu hình qua biến môi trường trước khi khởi động:
-    ```powershell
-    # Trên Windows (PowerShell)
-    $env:DB_PASSWORD='mat-khau-mysql-cua-ban'
-    .\mvnw.cmd spring-boot:run
-    
-    # Trên Windows (Command Prompt)
-    set DB_PASSWORD=mat-khau-mysql-cua-ban
-    mvnw spring-boot:run
-    
-    # Trên Linux / macOS
-    DB_PASSWORD='mat-khau-mysql-cua-ban' ./mvnw spring-boot:run
-    ```
-
-#### Bước 3: Truy cập Giao diện người dùng
-Khi thấy log thông báo khởi động thành công trên cổng `8080`, hãy truy cập trình duyệt tại địa chỉ:
-```text
-http://localhost:8080
-```
+#### Bước 3: Đóng gói và chạy dự án (Production Bundle)
+Nếu bạn muốn build dự án React thành tài nguyên tĩnh phục vụ trực tiếp bởi Spring Boot:
+1. Build frontend React:
+   ```bash
+   cd frontend
+   npm run build
+   ```
+   *Quá trình build sẽ kết xuất sản phẩm ra thư mục `frontend/dist`.*
+2. Trở lại thư mục gốc của dự án và khởi chạy Spring Boot:
+   ```powershell
+   # Trên Windows (PowerShell)
+   .\mvnw.cmd spring-boot:run
+   ```
+   *Maven sẽ tự động copy các file tĩnh từ `frontend/dist` sang `target/classes/static` và phục vụ tại địa chỉ `http://localhost:8080`.*
 
 ---
 
 ## 🔑 Danh Sách Tài Khoản Mẫu (Sample Seed Accounts)
 
-Ngay sau khi kết nối cơ sở dữ liệu thành công, hệ thống tự động khởi tạo các bảng và seed các tài khoản thử nghiệm sau:
+Sau khi khởi chạy, Flyway sẽ tự động chạy các tệp migrations và seed các tài khoản thử nghiệm sau:
 
 | Vai trò (Role) | Tên đăng nhập (Username) | Mật khẩu (Password) | Email liên kết | Mô tả mục đích sử dụng |
 | :--- | :--- | :--- | :--- | :--- |
@@ -193,16 +189,36 @@ Ngay sau khi kết nối cơ sở dữ liệu thành công, hệ thống tự đ
 
 ---
 
-## 🌐 Các Biến Cấu Hợp Môi Trường (Environment Variables)
+## 📸 Review & Demo các Chức năng Hệ thống
 
-Bạn có thể tùy biến các cấu hình sâu hơn của ứng dụng bằng các biến môi trường sau:
+Dưới đây là một số hình ảnh và video thực tế ghi lại từ hệ thống khi vận hành:
 
-| Tên biến môi trường | Mô tả cấu hình | Giá trị mặc định |
-| :--- | :--- | :--- |
-| `DB_URL` | Chuỗi kết nối JDBC MySQL | `jdbc:mysql://127.0.0.1:3306/webbanhang?createDatabaseIfNotExist=true&...` |
-| `DB_USERNAME` | Tên tài khoản quản trị MySQL | `root` |
-| `DB_PASSWORD` | Mật khẩu tài khoản MySQL | `123456` |
-| `JWT_SECRET` | Khóa bí mật dùng ký tên mã JWT | *Khóa ngẫu nhiên tự tạo trong code* |
-| `JWT_EXPIRATION_MINUTES` | Thời gian sống của JWT token (phút) | `720` (12 giờ) |
-| `UPLOAD_DIR` | Thư mục lưu trữ ảnh tải lên | `uploads` |
+### 📽️ Video Demo quy trình mua hàng & quản trị:
+- **Khách hàng mua hàng & Thanh toán**: [customer_flow_demo.webp](images/customer_flow_demo.webp)
+- **Quản trị viên quản lý Dashboard**: [admin_flow_demo.webp](images/admin_flow_demo.webp)
 
+### 🖼️ Hình ảnh các trang chức năng:
+
+#### 1. Đăng nhập & Đăng ký:
+![Màn hình Đăng nhập](images/login_page.png)
+
+#### 2. Hồ sơ cá nhân & Phân hạng thành viên:
+![Trang hồ sơ cá nhân](images/profile_page.png)
+
+#### 3. Admin Dashboard & Thống kê doanh thu:
+![Admin Dashboard](images/admin_dashboard.png)
+
+#### 4. Admin - Quản lý Sản phẩm (CRUD):
+![Quản lý sản phẩm](images/admin_products.png)
+
+#### 5. Admin - Quản lý Danh mục:
+![Quản lý danh mục](images/admin_categories.png)
+
+#### 6. Admin - Mã giảm giá (Coupon):
+![Quản lý coupon](images/admin_coupons.png)
+
+#### 7. Admin - Đơn hàng & Cập nhật trạng thái:
+![Quản lý đơn hàng](images/admin_orders.png)
+
+#### 8. Admin - Thùng rác khôi phục dữ liệu (Recycle Bin):
+![Thùng rác hệ thống](images/admin_recycle_bin.png)

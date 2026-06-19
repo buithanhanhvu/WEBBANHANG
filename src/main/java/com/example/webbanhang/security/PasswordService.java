@@ -1,27 +1,18 @@
 package com.example.webbanhang.security;
 
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 
 @Service
 public class PasswordService {
-    private static final String SALT = "webbanhang-local-salt";
+    private final PasswordEncoder encoder = new BCryptPasswordEncoder();
 
     public String hash(String rawPassword) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hashed = digest.digest((SALT + rawPassword).getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hashed);
-        } catch (NoSuchAlgorithmException ex) {
-            throw new IllegalStateException(ex);
-        }
+        return encoder.encode(rawPassword);
     }
 
     public boolean matches(String rawPassword, String passwordHash) {
-        return hash(rawPassword).equals(passwordHash);
+        return encoder.matches(rawPassword, passwordHash);
     }
 }
