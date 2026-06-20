@@ -28,6 +28,8 @@ export const AdminDashboard: React.FC = () => {
     monthlyRevenue: []
   });
 
+  const [hoveredBar, setHoveredBar] = useState<{ index: number; x: number; y: number; label: string; amount: number } | null>(null);
+
   // Entities Data
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -487,26 +489,233 @@ export const AdminDashboard: React.FC = () => {
             </div>
 
             {/* Custom Interactive SVG Chart Area */}
-            <div className="bg-white border border-slate-100 rounded-3rem p-6 sm:p-8 shadow-sm">
+            <div className="bg-white border border-slate-100 rounded-3rem p-6 sm:p-8 shadow-sm relative">
               <h3 className="text-base font-black text-slate-800 tracking-tight mb-6">Biểu đồ doanh thu</h3>
               
-              <div className="h-64 flex items-end justify-between gap-6 pt-4 border-b border-slate-100">
-                {stats.monthlyRevenue.map((d: any, idx: number) => {
-                  const maxAmt = Math.max(...stats.monthlyRevenue.map((m: any) => m.amount)) || 1;
-                  const pct = (d.amount / maxAmt) * 100;
+              {/* Tooltip HTML tuyệt đối */}
+              {hoveredBar && (
+                <div 
+                  className="absolute z-10 bg-slate-950/95 backdrop-blur-md text-white text-[10px] px-3.5 py-2.5 rounded-2xl shadow-xl pointer-events-none transition-all duration-200 border border-slate-800 flex flex-col items-center gap-0.5"
+                  style={{ 
+                    left: `${hoveredBar.x}px`, 
+                    top: `${hoveredBar.y}px`,
+                    transform: 'translate(-50%, -125%)'
+                  }}
+                >
+                  <span className="font-extrabold text-slate-400 uppercase tracking-wider">{hoveredBar.label}</span>
+                  <span className="font-black text-blue-405 text-xs">{formatPrice(hoveredBar.amount)}</span>
+                  {/* Mũi tên nhỏ ở dưới tooltip */}
+                  <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-950/95" />
+                </div>
+              )}
+
+              <div className="w-full">
+                {(() => {
+                  const data = stats.monthlyRevenue || [];
+                  if (data.length === 0) {
+                    return (
+                      <div className="h-48 flex items-center justify-center text-slate-400 font-semibold text-xs">
+                        Chưa có dữ liệu doanh thu
+                      </div>
+                    );
+                  }
+
+                  const maxAmt = Math.max(...data.map((m: any) => m.amount), 10000);
+                  // Làm tròn maxAmt lên một mốc số chẵn đẹp mắt để căn mốc trục Y
+                  let roundedMax = maxAmt;
+                  if (maxAmt > 1000000) {
+                    roundedMax = Math.ceil(maxAmt / 1000000) * 1000000;
+                  } else if (maxAmt > 1000) {
+                    roundedMax = Math.ceil(maxAmt / 1000) * 1000;
+                  }
+                  
+                  const yTicks = [0, roundedMax * 0.25, roundedMax * 0.5, roundedMax * 0.75, roundedMax];
+
+                  const paddingLeft = 70;
+                  const paddingRight = 30;
+                  const paddingTop = 20;
+                  const paddingBottom = 40;
+                  
+                  const width = 600;
+                  const height = 240;
+                  
+                  const chartWidth = width - paddingLeft - paddingRight;
+                  const chartHeight = height - paddingTop - paddingBottom;
+
+                  const formatShortPrice = (val: number) => {
+                    if (val === 0) return '0 ₫';
+                    if (val >= 1000000) return (val / 1000000).toFixed(1).replace(/\.0$/, '') + 'M ₫';
+                    if (val >= 1000) return (val / 1000).toFixed(0) + 'K ₫';
+                    return val + ' ₫';
+                  };
+
                   return (
-                    <div key={idx} className="flex-1 flex flex-col items-center group">
-                      <span className="text-[10px] font-extrabold text-slate-500 mb-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {formatPrice(d.amount)}
-                      </span>
-                      <div 
-                        style={{ height: `${pct * 1.5}px` }} 
-                        className="w-full bg-gradient-to-t from-blue-600 to-indigo-500 hover:from-blue-500 hover:to-indigo-400 rounded-t-xl transition-all duration-500 shadow-sm group-hover:scale-x-105"
-                      />
-                      <span className="text-[11px] font-bold text-slate-405 mt-2">{d.month}</span>
-                    </div>
+                    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto overflow-visible select-none">
+                      <defs>
+                        <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#2563eb" />
+                          <stop offset="100%" stopColor="#4f46e5" />
+                        </linearGradient>
+                        <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#2563eb" stopOpacity="0.25" />
+                          <stop offset="100%" stopColor="#4f46e5" stopOpacity="0.0" />
+                        </linearGradient>
+                      </defs>
+
+                      {/* 1. Gridlines & Y-Axis Labels */}
+                      {yTicks.map((val, idx) => {
+                        const y = paddingTop + chartHeight - (val / roundedMax) * chartHeight;
+                        return (
+                          <g key={idx}>
+                            <line 
+                              x1={paddingLeft} 
+                              y1={y} 
+                              x2={paddingLeft + chartWidth} 
+                              y2={y} 
+                              stroke="#e2e8f0" 
+                              strokeWidth="1.2" 
+                              strokeDasharray={val === 0 ? "0" : "4 4"}
+                            />
+                            <text 
+                              x={paddingLeft - 12} 
+                              y={y + 3.5} 
+                              textAnchor="end" 
+                              className="text-[10px] font-extrabold text-slate-400 fill-current"
+                            >
+                              {formatShortPrice(val)}
+                            </text>
+                          </g>
+                        );
+                      })}
+
+                      {/* 2. Chart Rendering logic */}
+                      {data.length === 1 ? (
+                        // Bar Chart for single data point
+                        (() => {
+                          const d = data[0];
+                          const barWidth = 45;
+                          const x = paddingLeft + chartWidth / 2 - barWidth / 2;
+                          const barHeight = (d.amount / roundedMax) * chartHeight;
+                          const y = paddingTop + chartHeight - barHeight;
+
+                          return (
+                            <g>
+                              {/* Pill shaped bar */}
+                              <rect 
+                                x={x} 
+                                y={y} 
+                                width={barWidth} 
+                                height={barHeight} 
+                                rx={10} 
+                                fill="url(#barGrad)"
+                                className="transition-all duration-300 hover:brightness-110 cursor-pointer"
+                                onMouseEnter={(e) => {
+                                  // Lấy tọa độ tương đối từ container
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  const parentRect = e.currentTarget.parentElement?.parentElement?.getBoundingClientRect();
+                                  if (parentRect) {
+                                    setHoveredBar({
+                                      index: 0,
+                                      x: (rect.left + rect.right) / 2 - parentRect.left,
+                                      y: rect.top - parentRect.top,
+                                      label: d.month,
+                                      amount: d.amount
+                                    });
+                                  }
+                                }}
+                                onMouseLeave={() => setHoveredBar(null)}
+                              />
+                              {/* Flat base for bottom corners */}
+                              {barHeight > 10 && (
+                                <rect 
+                                  x={x} 
+                                  y={paddingTop + chartHeight - 10} 
+                                  width={barWidth} 
+                                  height={10} 
+                                  fill="url(#barGrad)"
+                                />
+                              )}
+                              
+                              {/* X Axis Label */}
+                              <text 
+                                x={paddingLeft + chartWidth / 2} 
+                                y={paddingTop + chartHeight + 22} 
+                                textAnchor="middle" 
+                                className="text-[10px] font-extrabold text-slate-500 fill-current"
+                              >
+                                {d.month}
+                              </text>
+                            </g>
+                          );
+                        })()
+                      ) : (
+                        // Area Chart for multiple data points
+                        (() => {
+                          const points = data.map((d: any, idx: number) => {
+                            const x = paddingLeft + (chartWidth / (data.length - 1)) * idx;
+                            const y = paddingTop + chartHeight - (d.amount / roundedMax) * chartHeight;
+                            return { x, y, label: d.month, amount: d.amount };
+                          });
+
+                          // Generate line path definition
+                          const linePath = points.map((p: any, idx: number) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+                          // Generate area path definition
+                          const areaPath = `${linePath} L ${points[points.length - 1].x} ${paddingTop + chartHeight} L ${points[0].x} ${paddingTop + chartHeight} Z`;
+
+                          return (
+                            <g>
+                              {/* Vùng Area Gradient */}
+                              <path d={areaPath} fill="url(#areaGrad)" />
+                              
+                              {/* Đường Line nét vẽ */}
+                              <path d={linePath} fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+
+                              {/* Điểm nút và Trục X Labels */}
+                              {points.map((p: any, idx: number) => (
+                                <g key={idx}>
+                                  {/* Hoverable circle area */}
+                                  <circle 
+                                    cx={p.x} 
+                                    cy={p.y} 
+                                    r={6} 
+                                    fill="#2563eb" 
+                                    stroke="#ffffff" 
+                                    strokeWidth="2" 
+                                    className="transition-all duration-200 hover:r-8 hover:fill-blue-600 cursor-pointer shadow-md"
+                                    onMouseEnter={(e) => {
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      const parentRect = e.currentTarget.parentElement?.parentElement?.parentElement?.getBoundingClientRect();
+                                      if (parentRect) {
+                                        setHoveredBar({
+                                          index: idx,
+                                          x: rect.left + rect.width / 2 - parentRect.left,
+                                          y: rect.top - parentRect.top,
+                                          label: p.label,
+                                          amount: p.amount
+                                        });
+                                      }
+                                    }}
+                                    onMouseLeave={() => setHoveredBar(null)}
+                                  />
+                                  
+                                  {/* X Axis Label */}
+                                  <text 
+                                    x={p.x} 
+                                    y={paddingTop + chartHeight + 22} 
+                                    textAnchor="middle" 
+                                    className="text-[10px] font-extrabold text-slate-500 fill-current"
+                                  >
+                                    {p.label}
+                                  </text>
+                                </g>
+                              ))}
+                            </g>
+                          );
+                        })()
+                      )}
+                    </svg>
                   );
-                })}
+                })()}
               </div>
             </div>
 

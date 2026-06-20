@@ -697,9 +697,9 @@ public class ShopService {
         LocalDateTime start = resolvePeriodStart(period);
 
         String pCountSql = "SELECT COUNT(*) FROM products";
-        String oCountSql = "SELECT COUNT(*) FROM orders";
+        String oCountSql = "SELECT COUNT(*) FROM orders WHERE status = 'DELIVERED'";
         String uCountSql = "SELECT COUNT(*) FROM users WHERE role='CUSTOMER'";
-        String revSql = "SELECT COALESCE(SUM(total_amount),0) FROM orders WHERE status <> 'CANCELLED'";
+        String revSql = "SELECT COALESCE(SUM(total_amount),0) FROM orders WHERE status = 'DELIVERED'";
 
         if (start != null) {
             result.put("products", ((Number) entityManager.createNativeQuery(pCountSql + " WHERE created_at >= ?").setParameter(1, start).getSingleResult()).longValue());
@@ -751,7 +751,7 @@ public class ShopService {
                            "LEFT JOIN products p ON oi.product_id = p.id " +
                            "LEFT JOIN categories c ON p.category_id = c.id " +
                            "JOIN orders o ON oi.order_id = o.id " +
-                           "WHERE o.status <> 'CANCELLED' ";
+                           "WHERE o.status = 'DELIVERED' ";
         List<?> catRevs;
         if (start != null) {
             catRevs = entityManager.createNativeQuery(catRevSql + "AND o.created_at >= ? GROUP BY COALESCE(c.name, 'Khác') ORDER BY value DESC").setParameter(1, start).getResultList();
@@ -773,7 +773,7 @@ public class ShopService {
                             "FROM order_items oi " +
                             "LEFT JOIN products p ON oi.product_id = p.id " +
                             "JOIN orders o ON oi.order_id = o.id " +
-                            "WHERE o.status <> 'CANCELLED' ";
+                            "WHERE o.status = 'DELIVERED' ";
         List<?> topProds;
         if (start != null) {
             topProds = entityManager.createNativeQuery(topProdSql + "AND o.created_at >= ? GROUP BY oi.product_id, p.name, oi.product_name, p.image_url ORDER BY quantitySold DESC LIMIT 10").setParameter(1, start).getResultList();
@@ -797,7 +797,7 @@ public class ShopService {
         List<Map<String, Object>> chartData = new java.util.ArrayList<>();
         if ("today".equalsIgnoreCase(period)) {
             List<?> rows = entityManager.createNativeQuery(
-                "SELECT HOUR(created_at) as hr, COALESCE(SUM(total_amount),0) as rev FROM orders WHERE status <> 'CANCELLED' AND created_at >= ? GROUP BY HOUR(created_at) ORDER BY HOUR(created_at)"
+                "SELECT HOUR(created_at) as hr, COALESCE(SUM(total_amount),0) as rev FROM orders WHERE status = 'DELIVERED' AND created_at >= ? GROUP BY HOUR(created_at) ORDER BY HOUR(created_at)"
             ).setParameter(1, start).getResultList();
             for (Object r : rows) {
                 Object[] arr = (Object[]) r;
@@ -808,7 +808,7 @@ public class ShopService {
             }
         } else if ("week".equalsIgnoreCase(period) || "month".equalsIgnoreCase(period)) {
             List<?> rows = entityManager.createNativeQuery(
-                "SELECT DATE(created_at) as dt, COALESCE(SUM(total_amount),0) as rev FROM orders WHERE status <> 'CANCELLED' AND created_at >= ? GROUP BY DATE(created_at) ORDER BY DATE(created_at)"
+                "SELECT DATE(created_at) as dt, COALESCE(SUM(total_amount),0) as rev FROM orders WHERE status = 'DELIVERED' AND created_at >= ? GROUP BY DATE(created_at) ORDER BY DATE(created_at)"
             ).setParameter(1, start).getResultList();
             for (Object r : rows) {
                 Object[] arr = (Object[]) r;
@@ -818,7 +818,7 @@ public class ShopService {
                 chartData.add(m);
             }
         } else {
-            String sql = "SELECT DATE_FORMAT(created_at, '%Y-%m') as dt, COALESCE(SUM(total_amount),0) as rev FROM orders WHERE status <> 'CANCELLED' ";
+            String sql = "SELECT DATE_FORMAT(created_at, '%Y-%m') as dt, COALESCE(SUM(total_amount),0) as rev FROM orders WHERE status = 'DELIVERED' ";
             List<?> rows;
             if (start != null) {
                 rows = entityManager.createNativeQuery(sql + "AND created_at >= ? GROUP BY DATE_FORMAT(created_at, '%Y-%m') ORDER BY DATE_FORMAT(created_at, '%Y-%m')").setParameter(1, start).getResultList();
@@ -842,7 +842,7 @@ public class ShopService {
         Map<String, Object> result = new LinkedHashMap<>();
         LocalDateTime periodStart = resolvePeriodStart(period);
 
-        String baseSql = "SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE user_id=? AND status <> 'CANCELLED'";
+        String baseSql = "SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE user_id=? AND status = 'DELIVERED'";
         LocalDateTime todayStart = LocalDate.now().atStartOfDay();
         LocalDateTime monthStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
         LocalDateTime yearStart = LocalDate.now().withDayOfYear(1).atStartOfDay();
@@ -852,7 +852,7 @@ public class ShopService {
         result.put("spentThisMonth", new BigDecimal(entityManager.createNativeQuery(baseSql + " AND created_at >= ?").setParameter(1, userId).setParameter(2, monthStart).getSingleResult().toString()));
         result.put("spentThisYear", new BigDecimal(entityManager.createNativeQuery(baseSql + " AND created_at >= ?").setParameter(1, userId).setParameter(2, yearStart).getSingleResult().toString()));
 
-        String countSql = "SELECT COUNT(*) FROM orders WHERE user_id=? AND status <> 'CANCELLED'";
+        String countSql = "SELECT COUNT(*) FROM orders WHERE user_id=? AND status = 'DELIVERED'";
         if (periodStart != null) {
             result.put("totalOrders", ((Number) entityManager.createNativeQuery(countSql + " AND created_at >= ?").setParameter(1, userId).setParameter(2, periodStart).getSingleResult()).longValue());
         } else {
@@ -863,7 +863,7 @@ public class ShopService {
         List<?> monthlyRows = entityManager.createNativeQuery(
             "SELECT MONTH(created_at) as monthNum, COALESCE(SUM(total_amount),0) as amount " +
             "FROM orders " +
-            "WHERE user_id=? AND status <> 'CANCELLED' AND YEAR(created_at) = YEAR(CURDATE()) " +
+            "WHERE user_id=? AND status = 'DELIVERED' AND YEAR(created_at) = YEAR(CURDATE()) " +
             "GROUP BY MONTH(created_at) " +
             "ORDER BY MONTH(created_at)"
         ).setParameter(1, userId).getResultList();
@@ -883,7 +883,7 @@ public class ShopService {
                          "LEFT JOIN products p ON oi.product_id = p.id " +
                          "LEFT JOIN categories c ON p.category_id = c.id " +
                          "JOIN orders o ON oi.order_id = o.id " +
-                         "WHERE o.user_id=? AND o.status <> 'CANCELLED' ";
+                         "WHERE o.user_id=? AND o.status = 'DELIVERED' ";
         List<?> catRevs;
         if (periodStart != null) {
             catRevs = entityManager.createNativeQuery(catSql + "AND o.created_at >= ? GROUP BY COALESCE(c.name, 'Khác') ORDER BY value DESC").setParameter(1, userId).setParameter(2, periodStart).getResultList();
@@ -905,7 +905,7 @@ public class ShopService {
                             "FROM order_items oi " +
                             "LEFT JOIN products p ON oi.product_id = p.id " +
                             "JOIN orders o ON oi.order_id = o.id " +
-                            "WHERE o.user_id=? AND o.status <> 'CANCELLED' ";
+                            "WHERE o.user_id=? AND o.status = 'DELIVERED' ";
         List<?> topProds;
         if (periodStart != null) {
             topProds = entityManager.createNativeQuery(topProdSql + "AND o.created_at >= ? GROUP BY oi.product_id, p.name, oi.product_name, p.image_url ORDER BY quantity DESC LIMIT 5").setParameter(1, userId).setParameter(2, periodStart).getResultList();
@@ -929,7 +929,7 @@ public class ShopService {
         List<Map<String, Object>> dailySpending = new ArrayList<>();
         if ("today".equalsIgnoreCase(period)) {
             List<?> rows = entityManager.createNativeQuery(
-                "SELECT HOUR(created_at) as hr, COALESCE(SUM(total_amount),0) as amount FROM orders WHERE user_id=? AND status <> 'CANCELLED' AND created_at >= ? GROUP BY HOUR(created_at) ORDER BY HOUR(created_at)"
+                "SELECT HOUR(created_at) as hr, COALESCE(SUM(total_amount),0) as amount FROM orders WHERE user_id=? AND status = 'DELIVERED' AND created_at >= ? GROUP BY HOUR(created_at) ORDER BY HOUR(created_at)"
             ).setParameter(1, userId).setParameter(2, periodStart).getResultList();
             for (Object r : rows) {
                 Object[] arr = (Object[]) r;
@@ -940,7 +940,7 @@ public class ShopService {
             }
         } else if ("week".equalsIgnoreCase(period) || "month".equalsIgnoreCase(period)) {
             List<?> rows = entityManager.createNativeQuery(
-                "SELECT DATE(created_at) as dt, COALESCE(SUM(total_amount),0) as amount FROM orders WHERE user_id=? AND status <> 'CANCELLED' AND created_at >= ? GROUP BY DATE(created_at) ORDER BY DATE(created_at)"
+                "SELECT DATE(created_at) as dt, COALESCE(SUM(total_amount),0) as amount FROM orders WHERE user_id=? AND status = 'DELIVERED' AND created_at >= ? GROUP BY DATE(created_at) ORDER BY DATE(created_at)"
             ).setParameter(1, userId).setParameter(2, periodStart).getResultList();
             for (Object r : rows) {
                 Object[] arr = (Object[]) r;
@@ -950,7 +950,7 @@ public class ShopService {
                 dailySpending.add(m);
             }
         } else {
-            String sql = "SELECT DATE_FORMAT(created_at, '%Y-%m') as dt, COALESCE(SUM(total_amount),0) as amount FROM orders WHERE user_id=? AND status <> 'CANCELLED' ";
+            String sql = "SELECT DATE_FORMAT(created_at, '%Y-%m') as dt, COALESCE(SUM(total_amount),0) as amount FROM orders WHERE user_id=? AND status = 'DELIVERED' ";
             List<?> rows;
             if (periodStart != null) {
                 rows = entityManager.createNativeQuery(sql + "AND created_at >= ? GROUP BY DATE_FORMAT(created_at, '%Y-%m') ORDER BY dt").setParameter(1, userId).setParameter(2, periodStart).getResultList();
@@ -1127,7 +1127,7 @@ public class ShopService {
 
         // 2. Daily revenue list
         String dailyRevSql = "SELECT DATE(created_at) as dt, COUNT(id) as orderCount, COALESCE(SUM(total_amount),0) as amount " +
-                             "FROM orders WHERE status <> 'CANCELLED' ";
+                             "FROM orders WHERE status = 'DELIVERED' ";
         List<?> dailyRevRows;
         if (periodStart != null) {
             dailyRevRows = entityManager.createNativeQuery(dailyRevSql + "AND created_at >= ? GROUP BY DATE(created_at) ORDER BY DATE(created_at) DESC")
@@ -1150,7 +1150,7 @@ public class ShopService {
         String buyerSql = "SELECT u.id as userId, u.username, u.email, u.full_name as fullName, " +
                           "COUNT(o.id) as orderCount, COALESCE(SUM(o.total_amount),0) as totalSpent " +
                           "FROM orders o JOIN users u ON u.id = o.user_id " +
-                          "WHERE o.status <> 'CANCELLED' ";
+                          "WHERE o.status = 'DELIVERED' ";
         List<?> buyerRows;
         if (periodStart != null) {
             buyerRows = entityManager.createNativeQuery(buyerSql + "AND o.created_at >= ? GROUP BY u.id, u.username, u.email, u.full_name ORDER BY totalSpent DESC LIMIT 20")
@@ -1175,7 +1175,7 @@ public class ShopService {
         // 4. Recent order details
         String orderSql = "SELECT o.id, u.username, u.full_name as fullName, o.total_amount as totalAmount, o.status, o.created_at as createdAt " +
                           "FROM orders o JOIN users u ON u.id = o.user_id " +
-                          "WHERE o.status <> 'CANCELLED' ";
+                          "WHERE o.status = 'DELIVERED' ";
         List<?> orderDetailsRows;
         if (periodStart != null) {
             orderDetailsRows = entityManager.createNativeQuery(orderSql + "AND o.created_at >= ? ORDER BY o.created_at DESC LIMIT 50")
