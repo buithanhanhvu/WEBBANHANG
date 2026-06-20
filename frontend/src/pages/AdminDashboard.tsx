@@ -63,6 +63,7 @@ export const AdminDashboard: React.FC = () => {
   const [prodDiscount, setProdDiscount] = useState(0);
   const [prodFeatured, setProdFeatured] = useState(false);
   const [prodDesc, setProdDesc] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // Category Form Fields
   const [catName, setCatName] = useState('');
@@ -138,6 +139,35 @@ export const AdminDashboard: React.FC = () => {
       console.error('Failed to load admin data', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    setUploadingImage(true);
+    try {
+      const res = await api.post('/api/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      if (res.data && res.data.data && res.data.data.url) {
+        setProdImage(res.data.data.url);
+        alert('Tải ảnh lên thành công!');
+      } else {
+        alert('Có lỗi xảy ra khi tải ảnh lên!');
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(err.response?.data?.message || 'Có lỗi xảy ra khi tải ảnh lên!');
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -1138,9 +1168,69 @@ export const AdminDashboard: React.FC = () => {
                   <label htmlFor="prodDiscount" className="text-[10px] font-bold text-slate-500 tracking-wide uppercase">Phần trăm giảm giá</label>
                   <input id="prodDiscount" type="number" min="0" max="100" value={prodDiscount} onChange={(e) => setProdDiscount(Number(e.target.value))} placeholder="Nhập phần trăm giảm (nếu có)" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold" />
                 </div>
-                <div className="sm:col-span-2 space-y-1">
-                  <label htmlFor="prodImage" className="text-[10px] font-bold text-slate-500 tracking-wide uppercase">Đường dẫn ảnh sản phẩm (Image URL)</label>
-                  <input id="prodImage" type="text" value={prodImage} onChange={(e) => setProdImage(e.target.value)} placeholder="Nhập link ảnh sản phẩm (HTTPS)" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold" />
+                <div className="sm:col-span-2 space-y-2">
+                  <label className="text-[10px] font-bold text-slate-500 tracking-wide uppercase">Ảnh sản phẩm *</label>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Hộp tải tệp tin lên */}
+                    <div className="border border-dashed border-slate-200 rounded-xl p-4 flex flex-col items-center justify-center bg-slate-50 hover:bg-slate-100/70 transition-colors relative min-h-[100px]">
+                      {uploadingImage ? (
+                        <div className="flex flex-col items-center gap-1.5 py-4">
+                          <Loader2 className="h-6 w-6 text-blue-650 animate-spin" />
+                          <span className="text-[10px] font-bold text-slate-500">Đang tải ảnh lên...</span>
+                        </div>
+                      ) : (
+                        <label className="flex flex-col items-center gap-1.5 cursor-pointer py-4 w-full h-full justify-center">
+                          <Plus className="h-6 w-6 text-slate-400" />
+                          <span className="text-xs font-bold text-slate-655">Tải ảnh từ máy tính</span>
+                          <span className="text-[10px] text-slate-400 font-semibold">Nhấp để chọn tệp</span>
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            onChange={handleImageUpload} 
+                            className="hidden" 
+                          />
+                        </label>
+                      )}
+                    </div>
+
+                    {/* Hộp nhập liên kết & xem trước ảnh */}
+                    <div className="flex flex-col justify-between space-y-2">
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Hoặc nhập URL ảnh sản phẩm</span>
+                        <input 
+                          type="text" 
+                          value={prodImage} 
+                          onChange={(e) => setProdImage(e.target.value)} 
+                          placeholder="Nhập liên kết ảnh (https://...)" 
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold" 
+                        />
+                      </div>
+                      
+                      {prodImage && (
+                        <div className="flex items-center gap-3 p-2 border border-slate-100 rounded-xl bg-white shadow-xs">
+                          <img 
+                            src={prodImage} 
+                            alt="Preview" 
+                            className="h-12 w-12 object-cover rounded-lg border border-slate-150"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://placehold.co/100?text=Error';
+                            }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[10px] font-bold text-slate-600 truncate">{prodImage}</div>
+                            <button 
+                              type="button" 
+                              onClick={() => setProdImage('')} 
+                              className="text-[10px] text-red-500 font-bold hover:underline cursor-pointer flex items-center gap-1"
+                            >
+                              Xóa ảnh
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 <div className="sm:col-span-2 flex items-center gap-2 py-2">
                   <input type="checkbox" id="featured" checked={prodFeatured} onChange={(e) => setProdFeatured(e.target.checked)} className="h-4 w-4 accent-blue-600" />

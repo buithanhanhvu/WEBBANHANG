@@ -9,6 +9,7 @@ export const Home: React.FC = () => {
   const navigate = useNavigate();
   const [categories, setCategories] = useState<Category[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [heroProduct, setHeroProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,6 +23,12 @@ export const Home: React.FC = () => {
         // Filter featured or take first 4 as featured
         const products = prodRes.data.data || [];
         setFeaturedProducts(products.filter((p: Product) => p.featured).slice(0, 4));
+        
+        // Find Astra Phone X or ID 1 for hero banner
+        const hero = products.find((p: Product) => p.name.toLowerCase().includes('astra phone x') || p.id === 1);
+        if (hero) {
+          setHeroProduct(hero);
+        }
       })
       .catch((err) => {
         console.error('Failed to load home page data', err);
@@ -40,6 +47,10 @@ export const Home: React.FC = () => {
       default:
         return <HomeIcon className="h-6 w-6 text-emerald-500" />;
     }
+  };
+
+  const formatPrice = (value: number) => {
+    return new Intl.NumberFormat('vi-VN').format(value) + ' ₫';
   };
 
   return (
@@ -90,17 +101,30 @@ export const Home: React.FC = () => {
               <div className="absolute inset-0 rounded-full bg-indigo-500/20 blur-3xl animate-pulse" />
               
               {/* Floating Cards */}
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 w-64 h-80 rounded-3xl shadow-3xl p-6 flex flex-col justify-between transform rotate-6 hover:rotate-0 transition-transform duration-500">
+              <div 
+                onClick={() => navigate(`/product/${heroProduct?.id || 1}`)}
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 w-64 h-80 rounded-3xl shadow-3xl p-6 flex flex-col justify-between transform rotate-6 hover:rotate-0 transition-transform duration-500 cursor-pointer group/card"
+              >
                 <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-extrabold tracking-widest text-slate-450 uppercase">Astra Phone X</span>
+                  <span className="text-[10px] font-extrabold tracking-widest text-slate-450 uppercase">{heroProduct?.name || 'Astra Phone X'}</span>
                   <span className="px-2 py-0.5 rounded bg-blue-500/20 border border-blue-500/30 text-[9px] font-black text-blue-400">HOT</span>
                 </div>
-                <div className="my-auto py-4 flex justify-center">
-                  <Phone className="h-28 w-28 text-slate-100 drop-shadow-[0_10px_20px_rgba(59,130,246,0.3)]" />
+                <div className="my-auto py-4 flex justify-center h-40 items-center overflow-hidden">
+                  {heroProduct?.image_url ? (
+                    <img 
+                      src={heroProduct.image_url} 
+                      alt={heroProduct.name} 
+                      className="max-h-full max-w-full object-contain rounded-xl drop-shadow-[0_10px_20px_rgba(59,130,246,0.3)] transition-transform duration-500 group-hover/card:scale-105"
+                    />
+                  ) : (
+                    <Phone className="h-28 w-28 text-slate-100 drop-shadow-[0_10px_20px_rgba(59,130,246,0.3)]" />
+                  )}
                 </div>
                 <div>
-                  <h4 className="font-bold text-sm text-slate-200">Astra Phone X</h4>
-                  <p className="text-xs font-extrabold text-blue-400 mt-1">8,091,000 ₫</p>
+                  <h4 className="font-bold text-sm text-slate-200">{heroProduct?.name || 'Astra Phone X'}</h4>
+                  <p className="text-xs font-extrabold text-blue-400 mt-1">
+                    {heroProduct ? formatPrice(heroProduct.sale_price) : '8,091,000 ₫'}
+                  </p>
                 </div>
               </div>
             </div>
