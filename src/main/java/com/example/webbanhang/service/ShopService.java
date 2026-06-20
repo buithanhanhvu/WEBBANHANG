@@ -502,13 +502,22 @@ public class ShopService {
     public List<Map<String, Object>> availableVouchers(long userId) {
         List<Coupon> coupons = couponRepository.findAll();
         List<Map<String, Object>> result = new ArrayList<>();
+        LocalDate today = LocalDate.now();
         for (Coupon c : coupons) {
             if (Boolean.TRUE.equals(c.getActive())) {
+                if (c.getEndDate() != null && today.isAfter(c.getEndDate())) {
+                    continue; // Skip expired
+                }
+                if (c.getStartDate() != null && today.isBefore(c.getStartDate())) {
+                    continue; // Skip not-yet-started
+                }
                 Map<String, Object> m = mapCoupon(c);
                 boolean collected = userCouponRepository.findByUserIdAndCouponId(userId, c.getId()).isPresent();
                 long collectedCount = userCouponRepository.countByCouponId(c.getId());
+                boolean soldOut = c.getMaxUses() != null && collectedCount >= c.getMaxUses();
                 m.put("collected", collected ? 1 : 0);
                 m.put("collected_count", collectedCount);
+                m.put("sold_out", soldOut ? 1 : 0);
                 result.add(m);
             }
         }
@@ -548,6 +557,18 @@ public class ShopService {
         UserCoupon uc = UserCoupon.builder().user(u).coupon(c).build();
         userCouponRepository.save(uc);
         return mapCoupon(c);
+    }
+
+    public boolean canUserReviewProduct(long userId, long productId) {
+        Number purchased = (Number) entityManager.createQuery("""
+                SELECT COUNT(o.id) FROM Order o
+                JOIN o.items oi
+                WHERE o.user.id = :userId AND oi.product.id = :prodId AND o.status = 'DELIVERED'
+                """)
+                .setParameter("userId", userId)
+                .setParameter("prodId", productId)
+                .getSingleResult();
+        return purchased != null && purchased.intValue() > 0;
     }
 
     public List<Map<String, Object>> allUsers() {

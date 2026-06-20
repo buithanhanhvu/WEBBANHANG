@@ -2,7 +2,8 @@ import React from 'react';
 import { Product } from '../types';
 import { useCartStore } from '../store/useCartStore';
 import { useAuthStore } from '../store/useAuthStore';
-import { ShoppingCart, Star } from 'lucide-react';
+import { useWishlistStore } from '../store/useWishlistStore';
+import { ShoppingCart, Star, Heart } from 'lucide-react';
 
 interface ProductCardProps {
   product: Product;
@@ -12,6 +13,9 @@ interface ProductCardProps {
 export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick }) => {
   const addItem = useCartStore((state) => state.addItem);
   const user = useAuthStore((state) => state.user);
+  const { wishlistIds, toggleWishlist } = useWishlistStore();
+
+  const isWishlisted = wishlistIds.includes(product.id);
 
   const handleQuickAdd = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -24,6 +28,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick }) =>
       alert('Đã thêm sản phẩm vào giỏ hàng!');
     } catch (err: any) {
       alert(err.response?.data?.message || 'Có lỗi xảy ra!');
+    }
+  };
+
+  const handleToggleWishlist = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) {
+      alert('Vui lòng đăng nhập để lưu sản phẩm yêu thích!');
+      return;
+    }
+    try {
+      await toggleWishlist(product.id);
+    } catch (err) {
+      console.error('Failed to toggle wishlist item', err);
     }
   };
 
@@ -46,14 +63,25 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick }) =>
         
         {/* Discount badge */}
         {product.discount_percent > 0 && (
-          <div className="absolute top-3 left-3 rounded-lg bg-red-500 px-2 py-1 text-xs font-bold text-white shadow-sm">
+          <div className="absolute top-3 left-3 rounded-lg bg-red-500 px-2 py-1 text-xs font-bold text-white shadow-sm z-10">
             -{product.discount_percent}%
           </div>
         )}
 
+        {/* Wishlist toggle button */}
+        {user && (
+          <button
+            onClick={handleToggleWishlist}
+            className="absolute top-3 right-3 z-10 p-2 bg-white/90 backdrop-blur-xs rounded-xl shadow-sm border border-slate-100/50 hover:bg-white text-slate-400 hover:text-red-500 hover:scale-110 active:scale-95 transition-all cursor-pointer"
+            title={isWishlisted ? "Xóa khỏi danh sách yêu thích" : "Thêm vào danh sách yêu thích"}
+          >
+            <Heart className={`h-4 w-4 ${isWishlisted ? "fill-current text-red-500" : ""}`} />
+          </button>
+        )}
+
         {/* Featured badge */}
         {product.featured && (
-          <div className="absolute top-3 right-3 rounded-lg bg-amber-500 px-2 py-1 text-xs font-bold text-white shadow-sm">
+          <div className={`absolute rounded-lg bg-amber-500 px-2 py-1 text-xs font-bold text-white shadow-sm z-10 ${user ? 'top-13 right-3' : 'top-3 right-3'}`}>
             Nổi bật
           </div>
         )}
@@ -79,7 +107,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick }) =>
             <Star className="h-3.5 w-3.5 fill-current" />
             <span className="text-xs font-bold text-slate-700 ml-1">{product.average_rating}</span>
           </div>
-          <span className="text-[10px] text-slate-400">({product.review_count} đánh giá)</span>
+          <span className="text-[10px] text-slate-400">( {product.review_count} đánh giá )</span>
         </div>
 
         {/* Price section */}
@@ -90,7 +118,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick }) =>
                 <span className="text-xs text-slate-400 line-through">
                   {formatPrice(product.price)}
                 </span>
-                <span className="text-base font-extrabold text-red-600">
+                <span className="text-base font-extrabold text-red-650">
                   {formatPrice(product.sale_price)}
                 </span>
               </>
@@ -105,7 +133,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick }) =>
           <button 
             onClick={handleQuickAdd}
             disabled={product.stock <= 0}
-            className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-white transition-all hover:bg-blue-600 disabled:bg-slate-200 disabled:text-slate-400 cursor-pointer"
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-white transition-all hover:bg-blue-650 disabled:bg-slate-200 disabled:text-slate-450 cursor-pointer"
             title="Thêm nhanh vào giỏ"
           >
             <ShoppingCart className="h-4 w-4" />

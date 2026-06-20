@@ -71,6 +71,8 @@ export const AdminDashboard: React.FC = () => {
   const [coupDiscount, setCoupDiscount] = useState(0);
   const [coupActive, setCoupActive] = useState(true);
   const [coupMaxUses, setCoupMaxUses] = useState(100);
+  const [coupStartDate, setCoupStartDate] = useState('');
+  const [coupEndDate, setCoupEndDate] = useState('');
 
   useEffect(() => {
     // Check role, redirect if not ADMIN
@@ -212,8 +214,8 @@ export const AdminDashboard: React.FC = () => {
       discountPercent: coupDiscount,
       active: coupActive,
       maxUses: coupMaxUses,
-      startDate: new Date().toISOString().split('T')[0],
-      endDate: new Date(Date.now() + 365*24*60*60*1000).toISOString().split('T')[0]
+      startDate: coupStartDate || null,
+      endDate: coupEndDate || null
     };
 
     try {
@@ -322,11 +324,15 @@ export const AdminDashboard: React.FC = () => {
       setCoupDiscount(coup.discount_percent);
       setCoupActive(coup.active);
       setCoupMaxUses(coup.max_uses || 100);
+      setCoupStartDate(coup.start_date || '');
+      setCoupEndDate(coup.end_date || '');
     } else {
       setCoupCode('');
       setCoupDiscount(10);
       setCoupActive(true);
       setCoupMaxUses(100);
+      setCoupStartDate(new Date().toISOString().split('T')[0]);
+      setCoupEndDate(new Date(Date.now() + 365*24*60*60*1000).toISOString().split('T')[0]);
     }
     setShowCouponModal(true);
   };
@@ -675,6 +681,7 @@ export const AdminDashboard: React.FC = () => {
                     <th className="p-4">ID</th>
                     <th className="p-4">Mã Code</th>
                     <th className="p-4">Phần trăm giảm</th>
+                    <th className="p-4">Thời hạn sử dụng</th>
                     <th className="p-4">Lượt sử dụng tối đa</th>
                     <th className="p-4">Trạng thái</th>
                     <th className="p-4 text-right">Thao tác</th>
@@ -686,6 +693,15 @@ export const AdminDashboard: React.FC = () => {
                       <td className="p-4">{c.id}</td>
                       <td className="p-4 font-black text-blue-600 uppercase">{c.code}</td>
                       <td className="p-4">{c.discount_percent}%</td>
+                      <td className="p-4 font-medium text-slate-500">
+                        {c.start_date && c.end_date ? (
+                          `${new Date(c.start_date).toLocaleDateString('vi-VN')} - ${new Date(c.end_date).toLocaleDateString('vi-VN')}`
+                        ) : c.end_date ? (
+                          `Đến ${new Date(c.end_date).toLocaleDateString('vi-VN')}`
+                        ) : (
+                          'Vô thời hạn'
+                        )}
+                      </td>
                       <td className="p-4">{c.max_uses || 100}</td>
                       <td className="p-4">
                         <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${
@@ -968,6 +984,16 @@ export const AdminDashboard: React.FC = () => {
               <div className="space-y-1">
                 <label htmlFor="coupMaxUses" className="text-[10px] font-bold text-slate-500 tracking-wide uppercase">Lượt sử dụng tối đa</label>
                 <input id="coupMaxUses" required type="number" value={coupMaxUses} onChange={(e) => setCoupMaxUses(Number(e.target.value))} placeholder="Nhập lượt sử dụng tối đa" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label htmlFor="coupStartDate" className="text-[10px] font-bold text-slate-500 tracking-wide uppercase">Ngày bắt đầu</label>
+                  <input id="coupStartDate" type="date" value={coupStartDate} onChange={(e) => setCoupStartDate(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold" />
+                </div>
+                <div className="space-y-1">
+                  <label htmlFor="coupEndDate" className="text-[10px] font-bold text-slate-500 tracking-wide uppercase">Ngày hết hạn</label>
+                  <input id="coupEndDate" type="date" value={coupEndDate} onChange={(e) => setCoupEndDate(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold" />
+                </div>
               </div>
               <div className="flex items-center gap-2 py-2">
                 <input type="checkbox" id="active" checked={coupActive} onChange={(e) => setCoupActive(e.target.checked)} className="h-4 w-4 accent-blue-600" />

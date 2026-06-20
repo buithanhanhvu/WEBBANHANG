@@ -10,9 +10,12 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { Profile } from './pages/Profile';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
+import { Vouchers } from './pages/Vouchers';
+import { Wishlist } from './pages/Wishlist';
 import { CartDrawer } from './components/CartDrawer';
 import { useAuthStore } from './store/useAuthStore';
 import { useCartStore } from './store/useCartStore';
+import { useWishlistStore } from './store/useWishlistStore';
 import { ShoppingCart, User, LogOut, ShieldAlert, Heart, Bell } from 'lucide-react';
 
 const AppContent: React.FC = () => {
@@ -20,11 +23,13 @@ const AppContent: React.FC = () => {
   const location = useLocation();
   const { user, logout } = useAuthStore();
   const { items, fetchCart } = useCartStore();
+  const { fetchWishlistIds } = useWishlistStore();
   const [cartOpen, setCartOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
       fetchCart();
+      fetchWishlistIds();
     }
   }, [user]);
 
@@ -63,6 +68,11 @@ const AppContent: React.FC = () => {
                 Đơn hàng
               </Link>
             )}
+            {user && (
+              <Link to="/vouchers" className={`hover:text-blue-600 transition-colors ${location.pathname === '/vouchers' ? 'text-blue-600' : ''}`}>
+                Mã giảm giá
+              </Link>
+            )}
             {user && user.role === 'ADMIN' && (
               <Link to="/admin" className="flex items-center gap-1.5 text-amber-600 hover:text-amber-700 transition-colors">
                 <ShieldAlert className="h-4 w-4" />
@@ -73,11 +83,15 @@ const AppContent: React.FC = () => {
 
           {/* Actions & User profile */}
           <div className="flex items-center gap-4">
-            {/* Wishlist Link placeholder */}
+            {/* Wishlist Link */}
             {user && (
-              <button aria-label="Danh sách yêu thích" className="p-2 text-slate-400 hover:text-red-500 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer hidden sm:block">
+              <Link 
+                to="/wishlist" 
+                aria-label="Danh sách yêu thích" 
+                className="p-2 text-slate-400 hover:text-red-500 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer hidden sm:block"
+              >
                 <Heart className="h-4.5 w-4.5" />
-              </button>
+              </Link>
             )}
 
             {/* Cart trigger button */}
@@ -155,6 +169,8 @@ const AppContent: React.FC = () => {
           <Route path="/cart" element={<Cart />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/orders" element={<MyOrders />} />
+          <Route path="/vouchers" element={<Vouchers />} />
+          <Route path="/wishlist" element={<Wishlist />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/login" element={<Login />} />

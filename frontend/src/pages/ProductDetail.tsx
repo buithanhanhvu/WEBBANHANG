@@ -5,7 +5,8 @@ import { useCartStore } from '../store/useCartStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { Product, Review, PriceHistory } from '../types';
 import api from '../services/api';
-import { Star, ShoppingCart, Loader2, ArrowLeft, Send, History } from 'lucide-react';
+import { useWishlistStore } from '../store/useWishlistStore';
+import { Star, ShoppingCart, Loader2, ArrowLeft, Send, History, Heart } from 'lucide-react';
 
 export const ProductDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -18,6 +19,7 @@ export const ProductDetail: React.FC = () => {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [canReview, setCanReview] = useState(false);
 
   // Cart quantity state
   const [quantity, setQuantity] = useState(1);
@@ -25,20 +27,47 @@ export const ProductDetail: React.FC = () => {
 
   const user = useAuthStore((state) => state.user);
   const addItem = useCartStore((state) => state.addItem);
+  const { wishlistIds, toggleWishlist } = useWishlistStore();
+
+  const isWishlisted = wishlistIds.includes(Number(id));
+
+  const handleToggleWishlist = async () => {
+    if (!id || !user) {
+      alert('Vui lòng đăng nhập để thực hiện!');
+      return;
+    }
+    try {
+      const added = await toggleWishlist(Number(id));
+      alert(added ? 'Đã thêm vào danh sách yêu thích!' : 'Đã xóa khỏi danh sách yêu thích!');
+    } catch (err) {
+      alert('Không thể thực hiện hành động này.');
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
     setLoading(true);
 
-    Promise.all([
+    const promises: [Promise<any>, Promise<any>, Promise<any>, Promise<any>?] = [
       api.get(`/api/products/${id}`),
       api.get(`/api/products/${id}/reviews`),
       api.get(`/api/products/${id}/price-history`),
-    ])
-      .then(([prodRes, revRes, priceRes]) => {
+    ];
+
+    if (user) {
+      promises.push(api.get(`/api/products/${id}/can-review`));
+    }
+
+    Promise.all(promises)
+      .then(([prodRes, revRes, priceRes, canRevRes]) => {
         setProduct(prodRes.data.data);
         setReviews(revRes.data.data || []);
         setPriceHistory(priceRes.data.data || []);
+        if (canRevRes) {
+          setCanReview(canRevRes.data.data);
+        } else {
+          setCanReview(false);
+        }
       })
       .catch((err) => {
         console.error('Failed to load product details', err);
@@ -46,7 +75,7 @@ export const ProductDetail: React.FC = () => {
       .finally(() => {
         setLoading(false);
       });
-  }, [id]);
+  }, [id, user]);
 
   const handleAddToCart = async () => {
     if (!product) return;
@@ -71,7 +100,7 @@ export const ProductDetail: React.FC = () => {
     setSubmittingReview(true);
 
     try {
-      const res = await api.post(`/api/products/${id}/reviews`, { rating, comment });
+      const res = await api.post('/api/reviews', { productId: Number(id), rating, comment });
       setReviews([res.data.data, ...reviews]);
       setComment('');
       setRating(5);
@@ -121,14 +150,27 @@ export const ProductDetail: React.FC = () => {
 
         {/* Right: Info */}
         <div className="flex flex-col">
-          {product.brand && (
-            <span className="text-xs font-extrabold tracking-widest text-blue-600 uppercase mb-2">
-              {product.brand}
-            </span>
-          )}
-          <h1 className="text-3xl font-black text-slate-850 tracking-tight mb-3">
-            {product.name}
-          </h1>
+          <div className="flex justify-between items-start mb-3">
+            <div className="flex flex-col">
+              {product.brand && (
+                <span className="text-xs font-extrabold tracking-widest text-blue-600 uppercase mb-2">
+                  {product.brand}
+                </span>
+              )}
+              <h1 className="text-3xl font-black text-slate-850 tracking-tight">
+                {product.name}
+              </h1>
+            </div>
+            {user && (
+              <button
+                onClick={handleToggleWishlist}
+                className="p-3 bg-white border border-slate-100 hover:border-slate-200 rounded-2xl shadow-sm text-slate-400 hover:text-red-500 transition-all cursor-pointer"
+                title={isWishlisted ? "Xóa khỏi danh sách yêu thích" : "Thêm vào danh sách yêu thích"}
+              >
+                <Heart className={`h-6 w-6 ${isWishlisted ? "fill-current text-red-500" : ""}`} />
+              </button>
+            )}
+          </div>
 
           {/* Rating */}
           <div className="flex items-center gap-4 mb-6">
@@ -250,9 +292,23 @@ export const ProductDetail: React.FC = () => {
         <h3 className="text-lg font-black text-slate-850 mb-8">Đánh giá từ khách hàng ({reviews.length})</h3>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Write a review (Only if user is logged in) */}
+          {/* Write a review (Only if user is logged in and has purchased & received the item) */}
           <div className="lg:col-span-1">
-            {user ? (
+            {!user ? (
+              <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 text-center">
+                <p className="text-xs font-semibold text-slate-500 mb-4">Vui lòng đăng nhập để gửi đánh giá cho sản phẩm này.</p>
+                <Link
+                  to="/login"
+                  className="inline-block px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition-all"
+                >
+                  Đăng nhập ngay
+                </Link>
+              </div>
+            ) : !canReview ? (
+              <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 text-center text-slate-500 font-semibold text-xs leading-relaxed">
+                Chỉ những khách hàng đã mua và nhận hàng thành công sản phẩm này mới có thể viết đánh giá.
+              </div>
+            ) : (
               <form onSubmit={handleAddReview} className="bg-slate-50 rounded-2xl p-6 border border-slate-100 shadow-inner-sm">
                 <h4 className="font-bold text-slate-800 mb-4">Gửi đánh giá của bạn</h4>
                 
@@ -301,16 +357,6 @@ export const ProductDetail: React.FC = () => {
                   Gửi nhận xét
                 </button>
               </form>
-            ) : (
-              <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 text-center">
-                <p className="text-xs font-semibold text-slate-500 mb-4">Vui lòng đăng nhập để gửi đánh giá cho sản phẩm này.</p>
-                <Link
-                  to="/login"
-                  className="inline-block px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition-all"
-                >
-                  Đăng nhập ngay
-                </Link>
-              </div>
             )}
           </div>
 

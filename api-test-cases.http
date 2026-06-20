@@ -1,0 +1,100 @@
+### -------------------------------------------------------------
+### BỘ KIỂM THỬ API CHÍNH (8 TRƯỜNG HỢP KIỂM THỬ) - ASTRASHOP
+### -------------------------------------------------------------
+### Dùng với extension "REST Client" trên VS Code hoặc import vào Postman
+### Thay đổi biến @host nếu server chạy ở cổng khác.
+
+@host = http://localhost:8080
+@token = {{login.response.body.data.token}}
+
+### =============================================================
+### I. 4 TRƯỜNG HỢP KIỂM THỬ THÀNH CÔNG (SUCCESS CASES)
+### =============================================================
+
+### 1. [Thành công] Đăng ký khách hàng mới
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "customer_test_http",
+  "email": "customer_test_http@gmail.com",
+  "password": "Password123",
+  "fullName": "Khách Hàng Thử Nghiệm",
+  "phone": "0987654321",
+  "address": "123 Đường A, Hà Nội"
+}
+
+###
+
+### 2. [Thành công] Đăng nhập bằng tài khoản vừa tạo để lấy Token
+# @name login
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "usernameOrEmail": "customer_test_http",
+  "password": "Password123"
+}
+
+###
+
+### 3. [Thành công] Xem thông tin chi tiết một sản phẩm (Công khai)
+GET {{host}}/api/products/1
+
+###
+
+### 4. [Thành công] Thêm sản phẩm vào giỏ hàng (Yêu cầu Token đăng nhập)
+POST {{host}}/api/cart/add
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "productId": 1,
+  "quantity": 2
+}
+
+###
+
+
+### =============================================================
+### II. 4 TRƯỜNG HỢP KIỂM THỬ THẤT BẠI (FAILURE/EXCEPTION CASES)
+### =============================================================
+
+### 5. [Thất bại] Đăng nhập sai mật khẩu (Mã lỗi mong đợi: 401 hoặc 400)
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "usernameOrEmail": "customer_test_http",
+  "password": "SaiMatKhau123"
+}
+
+###
+
+### 6. [Thất bại] Thêm vào giỏ hàng khi chưa đăng nhập (Thiếu Token - Mã lỗi mong đợi: 403 hoặc 401)
+POST {{host}}/api/cart/add
+Content-Type: application/json
+
+{
+  "productId": 1,
+  "quantity": 1
+}
+
+###
+
+### 7. [Thất bại] Tài khoản USER thường truy cập trang Admin Dashboard (Phân quyền - Mã lỗi mong đợi: 403 Forbidden)
+GET {{host}}/api/admin/dashboard
+Authorization: Bearer {{token}}
+
+###
+
+### 8. [Thất bại] Đánh giá sản phẩm chưa mua hoặc chưa giao thành công (Logic nghiệp vụ - Mã lỗi mong đợi: 400 Bad Request)
+POST {{host}}/api/reviews
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "productId": 2,
+  "rating": 5,
+  "comment": "Sản phẩm rất tốt nhưng tôi chưa mua!"
+}

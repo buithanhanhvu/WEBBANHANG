@@ -16,10 +16,12 @@ import java.util.Map;
 public class CatalogController {
     private final CatalogService catalogService;
     private final ShopService shopService;
+    private final com.example.webbanhang.security.CurrentUserService currentUserService;
 
-    public CatalogController(CatalogService catalogService, ShopService shopService) {
+    public CatalogController(CatalogService catalogService, ShopService shopService, com.example.webbanhang.security.CurrentUserService currentUserService) {
         this.catalogService = catalogService;
         this.shopService = shopService;
+        this.currentUserService = currentUserService;
     }
 
     @GetMapping("/categories")
@@ -60,6 +62,17 @@ public class CatalogController {
     @Operation(summary = "Lấy danh sách đánh giá của sản phẩm")
     public ApiResponse<List<Map<String, Object>>> productReviews(@PathVariable long id) {
         return ApiResponse.ok(shopService.productReviews(id));
+    }
+
+    @GetMapping("/products/{id}/can-review")
+    @Operation(summary = "Kiểm tra xem người dùng hiện tại có được phép đánh giá sản phẩm hay không")
+    public ApiResponse<Boolean> canReview(@PathVariable long id, jakarta.servlet.http.HttpServletRequest request) {
+        try {
+            com.example.webbanhang.security.TokenService.AuthUser user = currentUserService.requireUser(request);
+            return ApiResponse.ok(shopService.canUserReviewProduct(user.id(), id));
+        } catch (Exception ex) {
+            return ApiResponse.ok(false);
+        }
     }
 
     @GetMapping("/products/{id}/price-history")
