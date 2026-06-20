@@ -316,6 +316,15 @@ public class CatalogService {
         map.put("id", cat.getId());
         map.put("name", cat.getName());
         map.put("description", cat.getDescription());
+
+        long count = 0;
+        if (cat.getId() != null) {
+            count = (long) entityManager.createQuery("SELECT COUNT(p.id) FROM Product p WHERE p.category.id = :catId")
+                    .setParameter("catId", cat.getId())
+                    .getSingleResult();
+        }
+        map.put("product_count", count);
+
         return map;
     }
 

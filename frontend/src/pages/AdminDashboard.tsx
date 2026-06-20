@@ -776,6 +776,7 @@ export const AdminDashboard: React.FC = () => {
                     <th className="p-4">Giá gốc</th>
                     <th className="p-4">Giảm giá</th>
                     <th className="p-4">Tồn kho</th>
+                    <th className="p-4">Danh mục</th>
                     <th className="p-4">Thương hiệu</th>
                     <th className="p-4 text-right">Thao tác</th>
                   </tr>
@@ -795,6 +796,11 @@ export const AdminDashboard: React.FC = () => {
                           p.stock < 5 ? 'bg-red-50 text-red-650' : 'bg-slate-150 text-slate-700'
                         }`}>
                           {p.stock}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <span className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-100 rounded-lg font-bold text-[10px]">
+                          {p.category_name || 'Chưa phân loại'}
                         </span>
                       </td>
                       <td className="p-4">{p.brand || '---'}</td>
@@ -845,6 +851,7 @@ export const AdminDashboard: React.FC = () => {
                     <th className="p-4">ID</th>
                     <th className="p-4">Tên danh mục</th>
                     <th className="p-4">Mô tả</th>
+                    <th className="p-4">Số sản phẩm</th>
                     <th className="p-4 text-right">Thao tác</th>
                   </tr>
                 </thead>
@@ -854,6 +861,11 @@ export const AdminDashboard: React.FC = () => {
                       <td className="p-4">{cat.id}</td>
                       <td className="p-4 font-bold text-slate-800">{cat.name}</td>
                       <td className="p-4">{cat.description || 'Chưa cập nhật mô tả'}</td>
+                      <td className="p-4">
+                        <span className="px-2.5 py-1 bg-slate-100 text-slate-700 border border-slate-200 rounded-lg font-black text-[10px]">
+                          {cat.product_count || 0} sản phẩm
+                        </span>
+                      </td>
                       <td className="p-4 text-right space-x-1.5">
                         <button 
                           onClick={() => openCategoryModal(cat)}
