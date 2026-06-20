@@ -1150,11 +1150,11 @@ export const AdminDashboard: React.FC = () => {
                 </div>
                 <div className="space-y-1">
                   <label htmlFor="prodPrice" className="text-[10px] font-bold text-slate-500 tracking-wide uppercase">Giá sản phẩm *</label>
-                  <input id="prodPrice" required type="number" value={prodPrice} onChange={(e) => setProdPrice(Number(e.target.value))} placeholder="Nhập giá bán" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold" />
+                  <input id="prodPrice" required type="number" value={prodPrice === 0 ? '' : prodPrice} onChange={(e) => setProdPrice(Number(e.target.value))} placeholder="Nhập giá bán" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold" />
                 </div>
                 <div className="space-y-1">
                   <label htmlFor="prodStock" className="text-[10px] font-bold text-slate-500 tracking-wide uppercase">Tồn kho *</label>
-                  <input id="prodStock" required type="number" value={prodStock} onChange={(e) => setProdStock(Number(e.target.value))} placeholder="Nhập số lượng tồn kho" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold" />
+                  <input id="prodStock" required type="number" value={prodStock === 0 ? '' : prodStock} onChange={(e) => setProdStock(Number(e.target.value))} placeholder="Nhập số lượng tồn kho" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold" />
                 </div>
                 <div className="space-y-1">
                   <label htmlFor="prodCatId" className="text-[10px] font-bold text-slate-500 tracking-wide uppercase">Danh mục *</label>
@@ -1166,7 +1166,7 @@ export const AdminDashboard: React.FC = () => {
                 </div>
                 <div className="space-y-1">
                   <label htmlFor="prodDiscount" className="text-[10px] font-bold text-slate-500 tracking-wide uppercase">Phần trăm giảm giá</label>
-                  <input id="prodDiscount" type="number" min="0" max="100" value={prodDiscount} onChange={(e) => setProdDiscount(Number(e.target.value))} placeholder="Nhập phần trăm giảm (nếu có)" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold" />
+                  <input id="prodDiscount" type="number" min="0" max="100" value={prodDiscount === 0 ? '' : prodDiscount} onChange={(e) => setProdDiscount(Number(e.target.value))} placeholder="Nhập phần trăm giảm (nếu có)" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold" />
                 </div>
                 <div className="sm:col-span-2 space-y-2">
                   <label className="text-[10px] font-bold text-slate-500 tracking-wide uppercase">Ảnh sản phẩm *</label>
