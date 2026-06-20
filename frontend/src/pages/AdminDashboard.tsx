@@ -99,20 +99,31 @@ export const AdminDashboard: React.FC = () => {
       const allProds = prodRes.data.data || [];
       const lowStock = allProds.filter((p: Product) => p.stock < 5);
 
+      const totalRevenue = dashData.revenue || 0;
+      const totalOrders = dashData.orders || 0;
+      const averageOrder = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+      const monthlyRevenue = dashData.revenueChartData && dashData.revenueChartData.length > 0
+        ? dashData.revenueChartData.map((item: any) => ({
+            month: item.label,
+            amount: item.value
+          }))
+        : [
+            { month: 'T1', amount: 5000000 },
+            { month: 'T2', amount: 8000000 },
+            { month: 'T3', amount: 15000000 },
+            { month: 'T4', amount: 12000000 },
+            { month: 'T5', amount: 22000000 },
+            { month: 'T6', amount: 28000000 }
+          ];
+
       setStats({
-        totalRevenue: dashData.totalRevenue || 0,
-        totalOrders: dashData.totalOrders || 0,
-        averageOrder: dashData.averageOrder || 0,
+        totalRevenue,
+        totalOrders,
+        averageOrder,
         lowStockCount: lowStock.length,
         lowStockProducts: lowStock,
-        monthlyRevenue: dashData.monthlyRevenue || [
-          { month: 'T1', amount: 5000000 },
-          { month: 'T2', amount: 8000000 },
-          { month: 'T3', amount: 15000000 },
-          { month: 'T4', amount: 12000000 },
-          { month: 'T5', amount: 22000000 },
-          { month: 'T6', amount: 28000000 }
-        ]
+        monthlyRevenue
       });
 
       setCategories(catRes.data.data || []);
