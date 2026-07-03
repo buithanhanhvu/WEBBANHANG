@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { FilterSidebar } from '../components/FilterSidebar';
 import { ProductCard } from '../components/ProductCard';
 import { Category, Product } from '../types';
@@ -9,9 +10,6 @@ import { Search, SlidersHorizontal, Loader2, ChevronLeft, ChevronRight } from 'l
 export const ProductList: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(false);
 
   // Filters State
   const [search, setSearch] = useState(searchParams.get('search') || '');
@@ -35,14 +33,36 @@ export const ProductList: React.FC = () => {
 
   const [showMobileFilter, setShowMobileFilter] = useState(false);
 
-  // Fetch Categories
-  useEffect(() => {
-    api.get('/api/categories').then((res) => {
-      setCategories(res.data.data || []);
-    });
-  }, []);
+  // Fetch Categories via React Query
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const res = await api.get('/api/categories');
+      return res.data.data || [];
+    }
+  });
 
-  // Sync state to URL and fetch Products
+  // Fetch Products via React Query
+  const { data: products = [], isLoading: loading } = useQuery<Product[]>({
+    queryKey: ['products', { search, selectedCategory, minPrice, maxPrice, selectedBrand, selectedRating, sortBy, page }],
+    queryFn: async () => {
+      const queryParams = new URLSearchParams();
+      if (search) queryParams.append('search', search);
+      if (selectedCategory !== null) queryParams.append('categoryId', selectedCategory.toString());
+      if (minPrice > 0) queryParams.append('minPrice', minPrice.toString());
+      if (maxPrice > 0) queryParams.append('maxPrice', maxPrice.toString());
+      if (selectedBrand) queryParams.append('brand', selectedBrand);
+      if (selectedRating !== null) queryParams.append('minRating', selectedRating.toString());
+      if (sortBy) queryParams.append('sortBy', sortBy);
+      queryParams.append('page', page.toString());
+      queryParams.append('size', '9'); // 9 items per page
+
+      const res = await api.get(`/api/products?${queryParams.toString()}`);
+      return res.data.data || [];
+    }
+  });
+
+  // Sync state to URL searchParams
   useEffect(() => {
     const params: any = {};
     if (search) params.search = search;
@@ -55,27 +75,6 @@ export const ProductList: React.FC = () => {
     if (page > 0) params.page = page.toString();
 
     setSearchParams(params);
-
-    // Call API
-    setLoading(true);
-    const queryParams = new URLSearchParams();
-    if (search) queryParams.append('search', search);
-    if (selectedCategory !== null) queryParams.append('categoryId', selectedCategory.toString());
-    if (minPrice > 0) queryParams.append('minPrice', minPrice.toString());
-    if (maxPrice > 0) queryParams.append('maxPrice', maxPrice.toString());
-    if (selectedBrand) queryParams.append('brand', selectedBrand);
-    if (selectedRating !== null) queryParams.append('minRating', selectedRating.toString());
-    if (sortBy) queryParams.append('sortBy', sortBy);
-    queryParams.append('page', page.toString());
-    queryParams.append('size', '9'); // 9 items per page
-
-    api.get(`/api/products?${queryParams.toString()}`)
-      .then((res) => {
-        setProducts(res.data.data || []);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
   }, [search, selectedCategory, minPrice, maxPrice, selectedBrand, selectedRating, sortBy, page]);
 
   const handlePriceChange = (min: number, max: number) => {

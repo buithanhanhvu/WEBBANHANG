@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
 import { useAuthStore } from '../store/useAuthStore';
 import api from '../services/api';
 import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
@@ -20,9 +21,12 @@ declare global {
   }
 }
 
+interface LoginFormInput {
+  usernameOrEmail: string;
+  password: string;
+}
+
 export const Login: React.FC = () => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -31,6 +35,13 @@ export const Login: React.FC = () => {
 
   const setAuth = useAuthStore((state) => state.setAuth);
   const navigate = useNavigate();
+
+  const { register, handleSubmit, formState: { errors } } = useForm<LoginFormInput>({
+    defaultValues: {
+      usernameOrEmail: '',
+      password: '',
+    }
+  });
 
   // Handle successful auth (common for both normal & google login)
   const handleAuthSuccess = (data: { user: any; token: string; refreshToken: string }) => {
@@ -94,13 +105,12 @@ export const Login: React.FC = () => {
     };
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: LoginFormInput) => {
     setLoading(true);
     setError(null);
 
     try {
-      const res = await api.post('/api/auth/login', { usernameOrEmail: username, password });
+      const res = await api.post('/api/auth/login', data);
       handleAuthSuccess(res.data.data);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Tài khoản hoặc mật khẩu không chính xác!');
@@ -130,7 +140,7 @@ export const Login: React.FC = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           {/* Username */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-500 tracking-wide uppercase">Tên đăng nhập / Email</label>
@@ -140,13 +150,14 @@ export const Login: React.FC = () => {
               </span>
               <input
                 type="text"
-                required
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                {...register('usernameOrEmail', { required: 'Tên đăng nhập hoặc email không được để trống' })}
                 placeholder="Nhập tên đăng nhập hoặc email"
                 className="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 bg-slate-50/50 text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all shadow-inner-sm"
               />
             </div>
+            {errors.usernameOrEmail && (
+              <p className="text-xs text-red-500 font-bold mt-1">{errors.usernameOrEmail.message}</p>
+            )}
           </div>
 
           {/* Password */}
@@ -161,9 +172,7 @@ export const Login: React.FC = () => {
               </span>
               <input
                 type={showPassword ? 'text' : 'password'}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                {...register('password', { required: 'Mật khẩu không được để trống' })}
                 placeholder="Nhập mật khẩu"
                 className="w-full pl-11 pr-11 py-3 rounded-2xl border border-slate-200 bg-slate-50/50 text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-all shadow-inner-sm"
               />
@@ -175,6 +184,9 @@ export const Login: React.FC = () => {
                 {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
               </button>
             </div>
+            {errors.password && (
+              <p className="text-xs text-red-500 font-bold mt-1">{errors.password.message}</p>
+            )}
           </div>
 
           <button

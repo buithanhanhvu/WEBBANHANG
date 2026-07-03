@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Order } from '../types';
 import { OrderStatusStepper } from '../components/OrderStatusStepper';
 import api from '../services/api';
@@ -7,54 +8,48 @@ import { ShoppingBag, ArrowLeft, Loader2, Calendar, FileText, CheckCircle2, Tras
 
 export const MyOrders: React.FC = () => {
   const navigate = useNavigate();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const queryClient = useQueryClient();
 
-  const fetchOrders = () => {
-    setLoading(true);
-    api.get('/api/orders')
-      .then((res) => {
-        setOrders(res.data.data || []);
-        // Automatically select the first order if available
-        if (res.data.data && res.data.data.length > 0) {
-          setSelectedOrder(res.data.data[0]);
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to fetch orders', err);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  };
+  // Fetch Orders via React Query
+  const { data: orders = [], isLoading: ordersLoading } = useQuery<Order[]>({
+    queryKey: ['orders'],
+    queryFn: async () => {
+      const res = await api.get('/api/orders');
+      return res.data.data || [];
+    }
+  });
 
+  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
+
+  // Automatically select the first order if none is selected
   useEffect(() => {
-    fetchOrders();
-  }, []);
+    if (orders.length > 0 && selectedOrderId === null) {
+      setSelectedOrderId(orders[0].id);
+    }
+  }, [orders, selectedOrderId]);
 
-  const handleCancelOrder = async (orderId: number) => {
+  const selectedOrder = orders.find(o => o.id === selectedOrderId) || null;
+  const loading = ordersLoading;
+
+  // Cancel Order Mutation
+  const cancelOrderMutation = useMutation({
+    mutationFn: async (orderId: number) => {
+      await api.delete(`/api/orders/${orderId}/cancel`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      alert('Hủy đơn hàng thành công!');
+    },
+    onError: (err: any) => {
+      alert(err.response?.data?.message || 'Có lỗi xảy ra, không thể hủy đơn hàng!');
+    }
+  });
+
+  const handleCancelOrder = (orderId: number) => {
     if (!window.confirm('Bạn có chắc chắn muốn hủy đơn hàng này không?')) {
       return;
     }
-    setCancellingId(orderId);
-    try {
-      await api.delete(`/api/orders/${orderId}/cancel`);
-      alert('Hủy đơn hàng thành công!');
-      
-      // Update selected order status to CANCELLED in local state
-      if (selectedOrder && selectedOrder.id === orderId) {
-        setSelectedOrder({ ...selectedOrder, status: 'CANCELLED' });
-      }
-      
-      // Re-fetch all orders
-      fetchOrders();
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Có lỗi xảy ra, không thể hủy đơn hàng!');
-    } finally {
-      setCancellingId(null);
-    }
+    cancelOrderMutation.mutate(orderId);
   };
 
   const formatPrice = (value: number) => {
@@ -82,7 +77,7 @@ export const MyOrders: React.FC = () => {
         </div>
         <button
           onClick={() => navigate('/')}
-          className="inline-flex items-center gap-2 text-xs font-bold text-slate-650 bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-xl transition-all shadow-sm cursor-pointer"
+          className="inline-flex items-center gap-2 text-xs font-bold text-slate-655 bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-xl transition-all shadow-sm cursor-pointer"
         >
           <ArrowLeft className="h-4 w-4" /> Tiếp tục mua sắm
         </button>
@@ -109,9 +104,9 @@ export const MyOrders: React.FC = () => {
               {orders.map((order) => (
                 <div
                   key={order.id}
-                  onClick={() => setSelectedOrder(order)}
+                  onClick={() => setSelectedOrderId(order.id)}
                   className={`p-5 rounded-3xl border transition-all duration-350 cursor-pointer flex flex-col justify-between hover:shadow-sm ${
-                    selectedOrder?.id === order.id
+                    selectedOrderId === order.id
                       ? 'bg-slate-900 border-slate-900 text-white shadow-md'
                       : 'bg-white border-slate-100 text-slate-800 hover:bg-slate-50/50'
                   }`}
@@ -119,7 +114,7 @@ export const MyOrders: React.FC = () => {
                   <div className="flex justify-between items-start">
                     <div>
                       <span className={`text-[10px] font-black tracking-widest uppercase ${
-                        selectedOrder?.id === order.id ? 'text-slate-400' : 'text-slate-500'
+                        selectedOrderId === order.id ? 'text-slate-400' : 'text-slate-500'
                       }`}>
                         Đơn hàng #{order.id}
                       </span>
@@ -176,10 +171,10 @@ export const MyOrders: React.FC = () => {
                   {selectedOrder.status === 'PENDING' && (
                     <button
                       onClick={() => handleCancelOrder(selectedOrder.id)}
-                      disabled={cancellingId === selectedOrder.id}
+                      disabled={cancelOrderMutation.isPending && cancelOrderMutation.variables === selectedOrder.id}
                       className="px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-650 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                     >
-                      {cancellingId === selectedOrder.id ? (
+                      {cancelOrderMutation.isPending && cancelOrderMutation.variables === selectedOrder.id ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
                         <Trash2 className="h-3.5 w-3.5" />

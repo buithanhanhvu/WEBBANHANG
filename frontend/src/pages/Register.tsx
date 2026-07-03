@@ -1,20 +1,21 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
 import { useAuthStore } from '../store/useAuthStore';
 import api from '../services/api';
 import { User, Mail, Lock, Phone, MapPin, Eye, EyeOff, Loader2 } from 'lucide-react';
 
-export const Register: React.FC = () => {
-  const [formData, setFormData] = useState({
-    username: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    fullName: '',
-    phone: '',
-    address: '',
-  });
+interface RegisterFormInput {
+  username: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  fullName: string;
+  phone: string;
+  address: string;
+}
 
+export const Register: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,28 +23,32 @@ export const Register: React.FC = () => {
   const setAuth = useAuthStore((state) => state.setAuth);
   const navigate = useNavigate();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (formData.password !== formData.confirmPassword) {
-      setError('Mật khẩu xác nhận không khớp!');
-      return;
+  const { register, handleSubmit, watch, formState: { errors } } = useForm<RegisterFormInput>({
+    defaultValues: {
+      username: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      fullName: '',
+      phone: '',
+      address: '',
     }
+  });
 
+  const passwordValue = watch('password');
+
+  const onSubmit = async (data: RegisterFormInput) => {
     setLoading(true);
     setError(null);
 
     try {
       const res = await api.post('/api/auth/register', {
-        username: formData.username,
-        email: formData.email,
-        password: formData.password,
-        fullName: formData.fullName,
-        phone: formData.phone,
-        address: formData.address,
+        username: data.username,
+        email: data.email,
+        password: data.password,
+        fullName: data.fullName,
+        phone: data.phone,
+        address: data.address,
       });
 
       const { user, token, refreshToken } = res.data.data;
@@ -78,7 +83,7 @@ export const Register: React.FC = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Username */}
             <div className="space-y-1">
@@ -89,14 +94,15 @@ export const Register: React.FC = () => {
                 </span>
                 <input
                   type="text"
-                  name="username"
-                  required
-                  value={formData.username}
-                  onChange={handleChange}
+                  {...register('username', { 
+                    required: 'Tên đăng nhập không được để trống',
+                    minLength: { value: 3, message: 'Tên đăng nhập phải có ít nhất 3 ký tự' }
+                  })}
                   placeholder="Username"
                   className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm font-medium text-slate-850 focus:outline-none focus:border-blue-500 focus:bg-white transition-all shadow-inner-sm"
                 />
               </div>
+              {errors.username && <p className="text-[10px] text-red-500 font-bold mt-1">{errors.username.message}</p>}
             </div>
 
             {/* Email */}
@@ -108,14 +114,18 @@ export const Register: React.FC = () => {
                 </span>
                 <input
                   type="email"
-                  name="email"
-                  required
-                  value={formData.email}
-                  onChange={handleChange}
+                  {...register('email', { 
+                    required: 'Email không được để trống',
+                    pattern: {
+                      value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                      message: 'Địa chỉ email không đúng định dạng'
+                    }
+                  })}
                   placeholder="name@example.com"
                   className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm font-medium text-slate-850 focus:outline-none focus:border-blue-500 focus:bg-white transition-all shadow-inner-sm"
                 />
               </div>
+              {errors.email && <p className="text-[10px] text-red-500 font-bold mt-1">{errors.email.message}</p>}
             </div>
           </div>
 
@@ -129,10 +139,14 @@ export const Register: React.FC = () => {
                 </span>
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  name="password"
-                  required
-                  value={formData.password}
-                  onChange={handleChange}
+                  {...register('password', { 
+                    required: 'Mật khẩu không được để trống',
+                    minLength: { value: 6, message: 'Mật khẩu phải có ít nhất 6 ký tự' },
+                    validate: {
+                      hasLetter: value => /[a-zA-Z]/.test(value) || 'Mật khẩu phải chứa cả chữ cái và chữ số',
+                      hasNumber: value => /\d/.test(value) || 'Mật khẩu phải chứa cả chữ cái và chữ số'
+                    }
+                  })}
                   placeholder="Mật khẩu"
                   className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm font-medium text-slate-850 focus:outline-none focus:border-blue-500 focus:bg-white transition-all shadow-inner-sm"
                 />
@@ -144,6 +158,7 @@ export const Register: React.FC = () => {
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
+              {errors.password && <p className="text-[10px] text-red-500 font-bold mt-1">{errors.password.message}</p>}
             </div>
 
             {/* Confirm Password */}
@@ -155,14 +170,15 @@ export const Register: React.FC = () => {
                 </span>
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  name="confirmPassword"
-                  required
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
+                  {...register('confirmPassword', { 
+                    required: 'Vui lòng xác nhận mật khẩu',
+                    validate: value => value === passwordValue || 'Mật khẩu xác nhận không khớp!'
+                  })}
                   placeholder="Xác nhận mật khẩu"
                   className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm font-medium text-slate-850 focus:outline-none focus:border-blue-500 focus:bg-white transition-all shadow-inner-sm"
                 />
               </div>
+              {errors.confirmPassword && <p className="text-[10px] text-red-500 font-bold mt-1">{errors.confirmPassword.message}</p>}
             </div>
           </div>
 
@@ -177,14 +193,12 @@ export const Register: React.FC = () => {
               </span>
               <input
                 type="text"
-                name="fullName"
-                required
-                value={formData.fullName}
-                onChange={handleChange}
+                {...register('fullName', { required: 'Họ và tên không được để trống' })}
                 placeholder="Nhập họ và tên đầy đủ"
                 className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm font-medium text-slate-850 focus:outline-none focus:border-blue-500 focus:bg-white transition-all shadow-inner-sm"
               />
             </div>
+            {errors.fullName && <p className="text-[10px] text-red-500 font-bold mt-1">{errors.fullName.message}</p>}
           </div>
 
           {/* Phone */}
@@ -196,14 +210,18 @@ export const Register: React.FC = () => {
               </span>
               <input
                 type="text"
-                name="phone"
-                required
-                value={formData.phone}
-                onChange={handleChange}
+                {...register('phone', { 
+                  required: 'Số điện thoại không được để trống',
+                  pattern: {
+                    value: /^\d{9,11}$/,
+                    message: 'Số điện thoại phải gồm 9 đến 11 chữ số'
+                  }
+                })}
                 placeholder="Nhập số điện thoại"
                 className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm font-medium text-slate-850 focus:outline-none focus:border-blue-500 focus:bg-white transition-all shadow-inner-sm"
               />
             </div>
+            {errors.phone && <p className="text-[10px] text-red-500 font-bold mt-1">{errors.phone.message}</p>}
           </div>
 
           {/* Address */}
@@ -215,14 +233,12 @@ export const Register: React.FC = () => {
               </span>
               <input
                 type="text"
-                name="address"
-                required
-                value={formData.address}
-                onChange={handleChange}
+                {...register('address', { required: 'Địa chỉ nhận hàng không được để trống' })}
                 placeholder="Nhập địa chỉ nhà, tên đường, quận/huyện, tỉnh/thành phố"
                 className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm font-medium text-slate-850 focus:outline-none focus:border-blue-500 focus:bg-white transition-all shadow-inner-sm"
               />
             </div>
+            {errors.address && <p className="text-[10px] text-red-500 font-bold mt-1">{errors.address.message}</p>}
           </div>
 
           <button

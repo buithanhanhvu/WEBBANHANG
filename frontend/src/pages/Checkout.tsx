@@ -1,21 +1,23 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
 import { useCartStore } from '../store/useCartStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { CouponInput } from '../components/CouponInput';
 import api from '../services/api';
 import { CreditCard, Truck, MessageSquare, ArrowLeft, Loader2, CheckCircle2, Ticket } from 'lucide-react';
 
+interface CheckoutFormInput {
+  shippingName: string;
+  shippingPhone: string;
+  shippingAddress: string;
+  note: string;
+}
+
 export const Checkout: React.FC = () => {
   const navigate = useNavigate();
   const { items, subtotal, clearCart } = useCartStore();
   const user = useAuthStore((state) => state.user);
-
-  // Form Fields
-  const [shippingName, setShippingName] = useState(user?.fullName || '');
-  const [shippingPhone, setShippingPhone] = useState(user?.phone || '');
-  const [shippingAddress, setShippingAddress] = useState(user?.address || '');
-  const [note, setNote] = useState('');
 
   // Coupon state
   const [couponCode, setCouponCode] = useState<string>('');
@@ -25,6 +27,15 @@ export const Checkout: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [orderId, setOrderId] = useState<number | null>(null);
+
+  const { register, handleSubmit, formState: { errors } } = useForm<CheckoutFormInput>({
+    defaultValues: {
+      shippingName: user?.fullName || '',
+      shippingPhone: user?.phone || '',
+      shippingAddress: user?.address || '',
+      note: ''
+    }
+  });
 
   const handleApplyCoupon = (code: string, discount: number, total: number) => {
     setCouponCode(code);
@@ -42,21 +53,15 @@ export const Checkout: React.FC = () => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
   };
 
-  const handlePlaceOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!shippingName.trim() || !shippingPhone.trim() || !shippingAddress.trim()) {
-      alert('Vui lòng điền đầy đủ thông tin giao hàng!');
-      return;
-    }
-
+  const onSubmit = async (data: CheckoutFormInput) => {
     setLoading(true);
     try {
       const payload = {
         couponCode: couponCode || null,
-        shippingName,
-        shippingAddress,
-        shippingPhone,
-        note
+        shippingName: data.shippingName,
+        shippingAddress: data.shippingAddress,
+        shippingPhone: data.shippingPhone,
+        note: data.note
       };
 
       const res = await api.post('/api/orders', payload);
@@ -123,7 +128,7 @@ export const Checkout: React.FC = () => {
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
       {/* Back to Cart */}
-      <Link to="/cart" className="inline-flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-850 mb-8 transition-colors">
+      <Link to="/cart" className="inline-flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-855 mb-8 transition-colors">
         <ArrowLeft className="h-4 w-4" /> Quay lại giỏ hàng
       </Link>
 
@@ -136,19 +141,20 @@ export const Checkout: React.FC = () => {
               Thông tin giao hàng
             </h2>
 
-            <form onSubmit={handlePlaceOrder} className="space-y-4">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               {/* Name */}
               <div className="space-y-1.5">
                 <label htmlFor="shippingName" className="text-xs font-bold text-slate-500 tracking-wide uppercase">Họ và tên người nhận</label>
                 <input
                   id="shippingName"
-                  required
                   type="text"
                   placeholder="Ví dụ: Nguyễn Văn A"
-                  value={shippingName}
-                  onChange={(e) => setShippingName(e.target.value)}
+                  {...register('shippingName', { required: 'Họ và tên người nhận không được để trống' })}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-500 transition-all shadow-sm"
                 />
+                {errors.shippingName && (
+                  <p className="text-xs text-red-500 font-bold mt-1">{errors.shippingName.message}</p>
+                )}
               </div>
 
               {/* Phone */}
@@ -156,13 +162,20 @@ export const Checkout: React.FC = () => {
                 <label htmlFor="shippingPhone" className="text-xs font-bold text-slate-500 tracking-wide uppercase">Số điện thoại</label>
                 <input
                   id="shippingPhone"
-                  required
                   type="tel"
                   placeholder="Ví dụ: 0912345678"
-                  value={shippingPhone}
-                  onChange={(e) => setShippingPhone(e.target.value)}
+                  {...register('shippingPhone', { 
+                    required: 'Số điện thoại không được để trống',
+                    pattern: {
+                      value: /^\d{9,11}$/,
+                      message: 'Số điện thoại không hợp lệ (phải gồm 9-11 chữ số)'
+                    }
+                  })}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-500 transition-all shadow-sm"
                 />
+                {errors.shippingPhone && (
+                  <p className="text-xs text-red-500 font-bold mt-1">{errors.shippingPhone.message}</p>
+                )}
               </div>
 
               {/* Address */}
@@ -170,13 +183,14 @@ export const Checkout: React.FC = () => {
                 <label htmlFor="shippingAddress" className="text-xs font-bold text-slate-500 tracking-wide uppercase">Địa chỉ chi tiết</label>
                 <input
                   id="shippingAddress"
-                  required
                   type="text"
                   placeholder="Số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành phố"
-                  value={shippingAddress}
-                  onChange={(e) => setShippingAddress(e.target.value)}
+                  {...register('shippingAddress', { required: 'Địa chỉ giao hàng không được để trống' })}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-500 transition-all shadow-sm"
                 />
+                {errors.shippingAddress && (
+                  <p className="text-xs text-red-500 font-bold mt-1">{errors.shippingAddress.message}</p>
+                )}
               </div>
 
               {/* Note */}
@@ -189,8 +203,7 @@ export const Checkout: React.FC = () => {
                   id="shippingNote"
                   rows={3}
                   placeholder="Ví dụ: Giao ngoài giờ hành chính, gọi điện trước khi giao..."
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
+                  {...register('note')}
                   className="w-full p-4 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-500 transition-all shadow-sm resize-none"
                 />
               </div>
@@ -214,7 +227,7 @@ export const Checkout: React.FC = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="mt-6 w-full py-4 rounded-2xl bg-slate-900 hover:bg-slate-850 text-white text-sm font-extrabold active:scale-98 transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed"
+                className="mt-6 w-full py-4 rounded-2xl bg-slate-900 hover:bg-slate-850 text-white text-sm font-extrabold active:scale-98 transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:bg-slate-200 disabled:text-slate-450 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <>

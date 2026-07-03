@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useForm, Controller } from 'react-hook-form';
 import { ProductImageGallery } from '../components/ProductImageGallery';
 import { useCartStore } from '../store/useCartStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -8,28 +10,83 @@ import api from '../services/api';
 import { useWishlistStore } from '../store/useWishlistStore';
 import { Star, ShoppingCart, Loader2, ArrowLeft, Send, History, Heart } from 'lucide-react';
 
+interface ReviewFormInput {
+  rating: number;
+  comment: string;
+}
+
 export const ProductDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const [product, setProduct] = useState<Product | null>(null);
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [priceHistory, setPriceHistory] = useState<PriceHistory[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Add review state
-  const [rating, setRating] = useState(5);
-  const [comment, setComment] = useState('');
-  const [submittingReview, setSubmittingReview] = useState(false);
-  const [canReview, setCanReview] = useState(false);
+  const user = useAuthStore((state) => state.user);
+  const addItem = useCartStore((state) => state.addItem);
+  const { wishlistIds, toggleWishlist } = useWishlistStore();
+  const queryClient = useQueryClient();
 
   // Cart quantity state
   const [quantity, setQuantity] = useState(1);
   const [addingToCart, setAddingToCart] = useState(false);
 
-  const user = useAuthStore((state) => state.user);
-  const addItem = useCartStore((state) => state.addItem);
-  const { wishlistIds, toggleWishlist } = useWishlistStore();
-
   const isWishlisted = wishlistIds.includes(Number(id));
+
+  // React Query definitions
+  const { data: product, isLoading: productLoading } = useQuery<Product>({
+    queryKey: ['product', id],
+    queryFn: async () => {
+      const res = await api.get(`/api/products/${id}`);
+      return res.data.data;
+    },
+    enabled: !!id
+  });
+
+  const { data: reviews = [] } = useQuery<Review[]>({
+    queryKey: ['reviews', id],
+    queryFn: async () => {
+      const res = await api.get(`/api/products/${id}/reviews`);
+      return res.data.data || [];
+    },
+    enabled: !!id
+  });
+
+  const { data: priceHistory = [] } = useQuery<PriceHistory[]>({
+    queryKey: ['priceHistory', id],
+    queryFn: async () => {
+      const res = await api.get(`/api/products/${id}/price-history`);
+      return res.data.data || [];
+    },
+    enabled: !!id
+  });
+
+  const { data: canReview = false } = useQuery<boolean>({
+    queryKey: ['canReview', id, user?.id],
+    queryFn: async () => {
+      const res = await api.get(`/api/products/${id}/can-review`);
+      return res.data.data || false;
+    },
+    enabled: !!id && !!user
+  });
+
+  const addReviewMutation = useMutation({
+    mutationFn: async (newReview: ReviewFormInput) => {
+      const res = await api.post('/api/reviews', { productId: Number(id), ...newReview });
+      return res.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reviews', id] });
+      alert('Gửi đánh giá thành công!');
+      reset();
+    },
+    onError: (err: any) => {
+      alert(err.response?.data?.message || 'Không thể gửi đánh giá. Có thể bạn chưa mua sản phẩm này!');
+    }
+  });
+
+  // React Hook Form definition
+  const { register, handleSubmit, control, reset, formState: { errors } } = useForm<ReviewFormInput>({
+    defaultValues: {
+      rating: 5,
+      comment: ''
+    }
+  });
 
   const handleToggleWishlist = async () => {
     if (!id || !user) {
@@ -43,39 +100,6 @@ export const ProductDetail: React.FC = () => {
       alert('Không thể thực hiện hành động này.');
     }
   };
-
-  useEffect(() => {
-    if (!id) return;
-    setLoading(true);
-
-    const promises: [Promise<any>, Promise<any>, Promise<any>, Promise<any>?] = [
-      api.get(`/api/products/${id}`),
-      api.get(`/api/products/${id}/reviews`),
-      api.get(`/api/products/${id}/price-history`),
-    ];
-
-    if (user) {
-      promises.push(api.get(`/api/products/${id}/can-review`));
-    }
-
-    Promise.all(promises)
-      .then(([prodRes, revRes, priceRes, canRevRes]) => {
-        setProduct(prodRes.data.data);
-        setReviews(revRes.data.data || []);
-        setPriceHistory(priceRes.data.data || []);
-        if (canRevRes) {
-          setCanReview(canRevRes.data.data);
-        } else {
-          setCanReview(false);
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to load product details', err);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [id, user]);
 
   const handleAddToCart = async () => {
     if (!product) return;
@@ -94,27 +118,15 @@ export const ProductDetail: React.FC = () => {
     }
   };
 
-  const handleAddReview = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!id || !user) return;
-    setSubmittingReview(true);
-
-    try {
-      const res = await api.post('/api/reviews', { productId: Number(id), rating, comment });
-      setReviews([res.data.data, ...reviews]);
-      setComment('');
-      setRating(5);
-      alert('Gửi đánh giá thành công!');
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Không thể gửi đánh giá. Có thể bạn chưa mua sản phẩm này!');
-    } finally {
-      setSubmittingReview(false);
-    }
+  const onSubmitReview = (data: ReviewFormInput) => {
+    addReviewMutation.mutate(data);
   };
 
   const formatPrice = (value: number) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
   };
+
+  const loading = productLoading;
 
   if (loading) {
     return (
@@ -309,47 +321,52 @@ export const ProductDetail: React.FC = () => {
                 Chỉ những khách hàng đã mua và nhận hàng thành công sản phẩm này mới có thể viết đánh giá.
               </div>
             ) : (
-              <form onSubmit={handleAddReview} className="bg-slate-50 rounded-2xl p-6 border border-slate-100 shadow-inner-sm">
+              <form onSubmit={handleSubmit(onSubmitReview)} className="bg-slate-50 rounded-2xl p-6 border border-slate-100 shadow-inner-sm">
                 <h4 className="font-bold text-slate-800 mb-4">Gửi đánh giá của bạn</h4>
                 
                 {/* Rating select */}
                 <div className="space-y-1.5 mb-4">
                   <label className="text-xs font-bold text-slate-500 tracking-wide uppercase">Số sao</label>
-                  <div className="flex gap-1">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        onClick={() => setRating(star)}
-                        className={`text-2xl cursor-pointer transition-colors ${
-                          star <= rating ? 'text-amber-450' : 'text-slate-300 hover:text-amber-200'
-                        }`}
-                      >
-                        ★
-                      </button>
-                    ))}
-                  </div>
+                  <Controller
+                    name="rating"
+                    control={control}
+                    render={({ field }) => (
+                      <div className="flex gap-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => field.onChange(star)}
+                            className={`text-2xl cursor-pointer transition-colors ${
+                              star <= field.value ? 'text-amber-450' : 'text-slate-300'
+                            }`}
+                          >
+                            ★
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  />
                 </div>
 
                 {/* Comment */}
                 <div className="space-y-1.5 mb-4">
                   <label className="text-xs font-bold text-slate-500 tracking-wide uppercase">Nhận xét</label>
                   <textarea
-                    required
+                    {...register('comment', { required: 'Nhận xét không được để trống' })}
                     rows={4}
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
                     placeholder="Chia sẻ nhận xét của bạn về sản phẩm..."
                     className="w-full p-3 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-all shadow-sm resize-none"
                   />
+                  {errors.comment && <p className="text-xs text-red-500 font-bold mt-1">{errors.comment.message}</p>}
                 </div>
 
                 <button
                   type="submit"
-                  disabled={submittingReview}
+                  disabled={addReviewMutation.isPending}
                   className="w-full py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 active:scale-98 transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:bg-slate-200 disabled:cursor-not-allowed"
                 >
-                  {submittingReview ? (
+                  {addReviewMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Send className="h-3.5 w-3.5" />

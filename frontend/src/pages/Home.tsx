@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { ProductCard } from '../components/ProductCard';
 import { Category, Product } from '../types';
 import api from '../services/api';
@@ -7,36 +8,26 @@ import { ShoppingBag, ArrowRight, Laptop, Phone, Home as HomeIcon, Star, Sparkle
 
 export const Home: React.FC = () => {
   const navigate = useNavigate();
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
-  const [heroProduct, setHeroProduct] = useState<Product | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      api.get('/api/categories'),
-      api.get('/api/products?size=8')
-    ])
-      .then(([catRes, prodRes]) => {
-        setCategories(catRes.data.data || []);
-        // Filter featured or take first 4 as featured
-        const products = prodRes.data.data || [];
-        setFeaturedProducts(products.filter((p: Product) => p.featured).slice(0, 4));
-        
-        // Find Astra Phone X or ID 1 for hero banner
-        const hero = products.find((p: Product) => p.name.toLowerCase().includes('astra phone x') || p.id === 1);
-        if (hero) {
-          setHeroProduct(hero);
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to load home page data', err);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, []);
+  const { data: categories = [], isLoading: categoriesLoading } = useQuery<Category[]>({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const res = await api.get('/api/categories');
+      return res.data.data || [];
+    }
+  });
+
+  const { data: products = [], isLoading: productsLoading } = useQuery<Product[]>({
+    queryKey: ['products', { size: 8 }],
+    queryFn: async () => {
+      const res = await api.get('/api/products?size=8');
+      return res.data.data || [];
+    }
+  });
+
+  const featuredProducts = products.filter((p) => p.featured).slice(0, 4);
+  const heroProduct = products.find((p) => p.name.toLowerCase().includes('astra phone x') || p.id === 1) || products[0] || null;
+  const loading = categoriesLoading || productsLoading;
 
   const getCategoryIcon = (name: string) => {
     switch (name.toLowerCase()) {

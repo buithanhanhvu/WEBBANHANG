@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../store/useAuthStore';
 import api from '../services/api';
 import { 
@@ -20,19 +21,14 @@ interface ExtendedCoupon extends Coupon {
 export const Vouchers: React.FC = () => {
   const { user } = useAuthStore();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   
   // Navigation tabs
   const [activeTab, setActiveTab] = useState<ActiveTab>('available');
   // Wallet filter tabs
   const [myFilter, setMyFilter] = useState<MyVoucherFilter>('usable');
-
-  // Data states
-  const [availableVouchers, setAvailableVouchers] = useState<ExtendedCoupon[]>([]);
-  const [myVouchers, setMyVouchers] = useState<ExtendedCoupon[]>([]);
   
-  // Loading & feedback states
-  const [loading, setLoading] = useState(true);
-  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
+  // Feedback states
   const [feedback, setFeedback] = useState<{ status: 'success' | 'error' | null; message: string }>({
     status: null,
     message: '',
@@ -46,51 +42,53 @@ export const Vouchers: React.FC = () => {
     }
   }, [user, navigate]);
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [availRes, myRes] = await Promise.all([
-        api.get('/api/auth/vouchers/available'),
-        api.get('/api/auth/vouchers/my')
-      ]);
-      setAvailableVouchers(availRes.data.data || []);
-      setMyVouchers(myRes.data.data || []);
-    } catch (err: any) {
-      console.error('Failed to load vouchers', err);
-      setFeedback({
-        status: 'error',
-        message: 'Không thể tải danh sách mã giảm giá. Vui lòng thử lại sau.'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Fetch Available Vouchers via useQuery
+  const { data: availableVouchers = [], isLoading: availLoading } = useQuery<ExtendedCoupon[]>({
+    queryKey: ['availableVouchers', user?.id],
+    queryFn: async () => {
+      const res = await api.get('/api/auth/vouchers/available');
+      return res.data.data || [];
+    },
+    enabled: !!user
+  });
 
-  useEffect(() => {
-    if (user) {
-      fetchData();
-    }
-  }, [user]);
+  // Fetch My Vouchers via useQuery
+  const { data: myVouchers = [], isLoading: myLoading } = useQuery<ExtendedCoupon[]>({
+    queryKey: ['myVouchers', user?.id],
+    queryFn: async () => {
+      const res = await api.get('/api/auth/vouchers/my');
+      return res.data.data || [];
+    },
+    enabled: !!user
+  });
 
-  const handleCollect = async (couponId: number) => {
-    setActionLoadingId(couponId);
-    setFeedback({ status: null, message: '' });
-    try {
+  const loading = availLoading || myLoading;
+
+  // Collect Voucher Mutation
+  const collectMutation = useMutation({
+    mutationFn: async (couponId: number) => {
       const res = await api.post(`/api/auth/vouchers/collect/${couponId}`);
+      return res.data.data;
+    },
+    onSuccess: (data) => {
       setFeedback({
         status: 'success',
-        message: `Thu thập mã giảm giá ${res.data.data.code} thành công! Đã thêm vào ví của bạn.`
+        message: `Thu thập mã giảm giá ${data.code} thành công! Đã thêm vào ví của bạn.`
       });
-      // Refresh list
-      await fetchData();
-    } catch (err: any) {
+      queryClient.invalidateQueries({ queryKey: ['availableVouchers', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['myVouchers', user?.id] });
+    },
+    onError: (err: any) => {
       setFeedback({
         status: 'error',
         message: err.response?.data?.message || 'Không thể thu thập mã giảm giá này.'
       });
-    } finally {
-      setActionLoadingId(null);
     }
+  });
+
+  const handleCollect = (couponId: number) => {
+    setFeedback({ status: null, message: '' });
+    collectMutation.mutate(couponId);
   };
 
   const handleCopyCode = (couponId: number, code: string) => {
@@ -293,11 +291,11 @@ export const Vouchers: React.FC = () => {
                                 </span>
                               ) : (
                                 <button
-                                  disabled={actionLoadingId === voucher.id}
+                                  disabled={collectMutation.isPending && collectMutation.variables === voucher.id}
                                   onClick={() => handleCollect(voucher.id)}
                                   className="px-4 py-1.5 bg-slate-900 hover:bg-blue-650 disabled:bg-slate-200 disabled:text-slate-450 text-white text-[10.5px] font-extrabold rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1"
                                 >
-                                  {actionLoadingId === voucher.id ? (
+                                  {collectMutation.isPending && collectMutation.variables === voucher.id ? (
                                     <>
                                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                       Đang nhận...
