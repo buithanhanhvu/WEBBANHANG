@@ -203,6 +203,21 @@ public class CatalogService {
                 .brand(request.brand())
                 .build();
         p = productRepository.save(p);
+
+        if (request.images() != null && !request.images().isEmpty()) {
+            List<com.example.webbanhang.domain.ProductImage> galleryImages = new ArrayList<>();
+            for (String imgUrl : request.images()) {
+                if (imgUrl != null && !imgUrl.isBlank()) {
+                    galleryImages.add(com.example.webbanhang.domain.ProductImage.builder()
+                            .product(p)
+                            .imageUrl(imgUrl.trim())
+                            .build());
+                }
+            }
+            p.setImages(galleryImages);
+            p = productRepository.save(p);
+        }
+
         return mapProduct(p);
     }
 
@@ -234,6 +249,23 @@ public class CatalogService {
         p.setFeatured(Boolean.TRUE.equals(request.featured()));
         p.setDiscountPercent(newDiscount);
         p.setBrand(request.brand());
+
+        // Update gallery images
+        if (p.getImages() != null) {
+            p.getImages().clear();
+        } else {
+            p.setImages(new ArrayList<>());
+        }
+        if (request.images() != null) {
+            for (String imgUrl : request.images()) {
+                if (imgUrl != null && !imgUrl.isBlank()) {
+                    p.getImages().add(com.example.webbanhang.domain.ProductImage.builder()
+                            .product(p)
+                            .imageUrl(imgUrl.trim())
+                            .build());
+                }
+            }
+        }
 
         p = productRepository.save(p);
 
@@ -343,6 +375,18 @@ public class CatalogService {
         map.put("discount_percent", p.getDiscountPercent());
         map.put("brand", p.getBrand());
         map.put("created_at", p.getCreatedAt());
+
+        if (p.getImages() != null) {
+            List<Map<String, Object>> imgList = p.getImages().stream().map(img -> {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("id", img.getId());
+                m.put("imageUrl", img.getImageUrl());
+                return m;
+            }).toList();
+            map.put("images", imgList);
+        } else {
+            map.put("images", Collections.emptyList());
+        }
 
         double avg = 0.0;
         long count = 0;

@@ -112,7 +112,8 @@ public final class Requests {
         @Max(value = 100, message = "Discount cannot exceed 100%")
         Integer discountPercent,
 
-        String brand
+        String brand,
+        java.util.List<String> images
     ) {}
 
     public record CartRequest(

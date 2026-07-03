@@ -64,6 +64,8 @@ export const AdminDashboard: React.FC = () => {
   const [prodFeatured, setProdFeatured] = useState(false);
   const [prodDesc, setProdDesc] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [prodGallery, setProdGallery] = useState<string[]>([]);
+  const [galleryUploadLoading, setGalleryUploadLoading] = useState(false);
 
   // Category Form Fields
   const [catName, setCatName] = useState('');
@@ -171,6 +173,35 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    setGalleryUploadLoading(true);
+    try {
+      const res = await api.post('/api/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      if (res.data && res.data.data && res.data.data.url) {
+        setProdGallery(prev => [...prev, res.data.data.url]);
+        alert('Tải ảnh chi tiết lên thành công!');
+      } else {
+        alert('Có lỗi xảy ra khi tải ảnh!');
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(err.response?.data?.message || 'Có lỗi xảy ra khi tải ảnh!');
+    } finally {
+      setGalleryUploadLoading(false);
+    }
+  };
+
   const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prodName.trim() || !prodCatId || prodPrice <= 0) {
@@ -187,7 +218,8 @@ export const AdminDashboard: React.FC = () => {
       imageUrl: prodImage,
       discountPercent: prodDiscount,
       featured: prodFeatured,
-      description: prodDesc
+      description: prodDesc,
+      images: prodGallery
     };
 
     try {
@@ -334,6 +366,7 @@ export const AdminDashboard: React.FC = () => {
       setProdDiscount(product.discount_percent);
       setProdFeatured(product.featured);
       setProdDesc(product.description || '');
+      setProdGallery(product.images ? product.images.map(img => img.imageUrl) : []);
     } else {
       setProdName('');
       setProdBrand('');
@@ -344,6 +377,7 @@ export const AdminDashboard: React.FC = () => {
       setProdDiscount(0);
       setProdFeatured(false);
       setProdDesc('');
+      setProdGallery([]);
     }
     setShowProductModal(true);
   };
@@ -1232,6 +1266,93 @@ export const AdminDashboard: React.FC = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Product Gallery Images */}
+                <div className="sm:col-span-2 space-y-2 border-t border-slate-100 pt-4">
+                  <label className="text-[10px] font-bold text-slate-500 tracking-wide uppercase">Bộ sưu tập ảnh chi tiết (Gallery)</label>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Upload detailed image file */}
+                    <div className="border border-dashed border-slate-200 rounded-xl p-4 flex flex-col items-center justify-center bg-slate-50 hover:bg-slate-100/70 transition-colors relative min-h-[100px]">
+                      {galleryUploadLoading ? (
+                        <div className="flex flex-col items-center gap-1.5 py-4">
+                          <Loader2 className="h-6 w-6 text-blue-655 animate-spin" />
+                          <span className="text-[10px] font-bold text-slate-500">Đang tải ảnh chi tiết...</span>
+                        </div>
+                      ) : (
+                        <label className="flex flex-col items-center gap-1.5 cursor-pointer py-4 w-full h-full justify-center">
+                          <Plus className="h-6 w-6 text-slate-400" />
+                          <span className="text-xs font-bold text-slate-655">Tải ảnh chi tiết từ máy tính</span>
+                          <span className="text-[10px] text-slate-400 font-semibold">Chọn tệp hình ảnh</span>
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            onChange={handleGalleryUpload} 
+                            className="hidden" 
+                          />
+                        </label>
+                      )}
+                    </div>
+
+                    {/* Manual URL Input for gallery */}
+                    <div className="flex flex-col justify-between space-y-2">
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Hoặc thêm URL ảnh chi tiết</span>
+                        <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            id="gallery-url-input"
+                            placeholder="Nhập liên kết ảnh chi tiết..." 
+                            className="flex-grow px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold" 
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const input = e.currentTarget;
+                                if (input.value.trim()) {
+                                  setProdGallery(prev => [...prev, input.value.trim()]);
+                                  input.value = '';
+                                }
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const input = document.getElementById('gallery-url-input') as HTMLInputElement;
+                              if (input && input.value.trim()) {
+                                setProdGallery(prev => [...prev, input.value.trim()]);
+                                input.value = '';
+                              }
+                            }}
+                            className="px-3.5 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 cursor-pointer"
+                          >
+                            Thêm
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Render current gallery list with delete button */}
+                  {prodGallery.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+                      {prodGallery.map((imgUrl, idx) => (
+                        <div key={idx} className="relative group rounded-xl overflow-hidden border border-slate-150 shadow-xs h-20 bg-slate-100">
+                          <img src={imgUrl} alt={`Gallery ${idx}`} className="h-full w-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => setProdGallery(prev => prev.filter((_, i) => i !== idx))}
+                            className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-sm cursor-pointer"
+                            title="Xóa ảnh này"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <div className="sm:col-span-2 flex items-center gap-2 py-2">
                   <input type="checkbox" id="featured" checked={prodFeatured} onChange={(e) => setProdFeatured(e.target.checked)} className="h-4 w-4 accent-blue-600" />
                   <label htmlFor="featured" className="text-xs font-bold text-slate-655 cursor-pointer">Sản phẩm nổi bật (Featured Product)</label>
