@@ -205,17 +205,15 @@ public class CatalogService {
         p = productRepository.save(p);
 
         if (request.images() != null && !request.images().isEmpty()) {
-            List<com.example.webbanhang.domain.ProductImage> galleryImages = new ArrayList<>();
             for (String imgUrl : request.images()) {
                 if (imgUrl != null && !imgUrl.isBlank()) {
-                    galleryImages.add(com.example.webbanhang.domain.ProductImage.builder()
+                    entityManager.persist(com.example.webbanhang.domain.ProductImage.builder()
                             .product(p)
                             .imageUrl(imgUrl.trim())
                             .build());
                 }
             }
-            p.setImages(galleryImages);
-            p = productRepository.save(p);
+            entityManager.flush();
         }
 
         return mapProduct(p);
@@ -250,24 +248,24 @@ public class CatalogService {
         p.setDiscountPercent(newDiscount);
         p.setBrand(request.brand());
 
-        // Update gallery images
-        if (p.getImages() != null) {
-            p.getImages().clear();
-        } else {
-            p.setImages(new ArrayList<>());
-        }
+        p = productRepository.save(p);
+
+        // Delete old gallery images and persist new ones
+        entityManager.createQuery("DELETE FROM ProductImage pi WHERE pi.product.id = :prodId")
+                .setParameter("prodId", p.getId())
+                .executeUpdate();
+
         if (request.images() != null) {
             for (String imgUrl : request.images()) {
                 if (imgUrl != null && !imgUrl.isBlank()) {
-                    p.getImages().add(com.example.webbanhang.domain.ProductImage.builder()
+                    entityManager.persist(com.example.webbanhang.domain.ProductImage.builder()
                             .product(p)
                             .imageUrl(imgUrl.trim())
                             .build());
                 }
             }
         }
-
-        p = productRepository.save(p);
+        entityManager.flush();
 
         if (priceChanged || discountChanged) {
             PriceHistory history = PriceHistory.builder()
@@ -376,8 +374,17 @@ public class CatalogService {
         map.put("brand", p.getBrand());
         map.put("created_at", p.getCreatedAt());
 
-        if (p.getImages() != null) {
-            List<Map<String, Object>> imgList = p.getImages().stream().map(img -> {
+        List<com.example.webbanhang.domain.ProductImage> productImages = Collections.emptyList();
+        if (p.getId() != null) {
+            productImages = entityManager.createQuery(
+                "SELECT pi FROM ProductImage pi WHERE pi.product.id = :prodId", com.example.webbanhang.domain.ProductImage.class
+            )
+            .setParameter("prodId", p.getId())
+            .getResultList();
+        }
+
+        if (productImages != null && !productImages.isEmpty()) {
+            List<Map<String, Object>> imgList = productImages.stream().map(img -> {
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("id", img.getId());
                 m.put("imageUrl", img.getImageUrl());
