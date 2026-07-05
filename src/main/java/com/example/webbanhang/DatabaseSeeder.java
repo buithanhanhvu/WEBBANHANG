@@ -3,6 +3,7 @@ package com.example.webbanhang;
 import com.example.webbanhang.domain.*;
 import com.example.webbanhang.repository.*;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -11,11 +12,13 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Component
+@ConditionalOnProperty(name = "app.seed.enabled", havingValue = "true", matchIfMissing = true)
 public class DatabaseSeeder implements CommandLineRunner {
 
     private final RankRepository rankRepository;
     private final CategoryRepository categoryRepository;
     private final ProductRepository productRepository;
+    private final ProductImageRepository productImageRepository;
     private final UserRepository userRepository;
     private final CouponRepository couponRepository;
     private final OrderRepository orderRepository;
@@ -25,6 +28,7 @@ public class DatabaseSeeder implements CommandLineRunner {
             RankRepository rankRepository,
             CategoryRepository categoryRepository,
             ProductRepository productRepository,
+            ProductImageRepository productImageRepository,
             UserRepository userRepository,
             CouponRepository couponRepository,
             OrderRepository orderRepository,
@@ -32,6 +36,7 @@ public class DatabaseSeeder implements CommandLineRunner {
         this.rankRepository = rankRepository;
         this.categoryRepository = categoryRepository;
         this.productRepository = productRepository;
+        this.productImageRepository = productImageRepository;
         this.userRepository = userRepository;
         this.couponRepository = couponRepository;
         this.orderRepository = orderRepository;
@@ -501,6 +506,58 @@ public class DatabaseSeeder implements CommandLineRunner {
 
         // Fetch products and coupons for order association
         List<Product> products = productRepository.findAll();
+
+        // 5.1. Seed Product Images (Gallery)
+        if (productImageRepository.count() == 0) {
+            List<ProductImage> galleryImages = new java.util.ArrayList<>();
+            for (Product p : products) {
+                String name = p.getName().toLowerCase();
+                if (name.contains("iphone")) {
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=900").build());
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?w=900").build());
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1592899677977-9c10ca588bbd?w=900").build());
+                } else if (name.contains("samsung")) {
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=900").build());
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?w=900").build());
+                } else if (name.contains("macbook")) {
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=900").build());
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?w=900").build());
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1541807084-5c52b6b3adef?w=900").build());
+                } else if (name.contains("dell") || name.contains("hp") || name.contains("lenovo") || name.contains("novabook") || name.contains("workstation")) {
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=900").build());
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=900").build());
+                } else if (name.contains("sony") || name.contains("buds") || name.contains("pulse")) {
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=900").build());
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=900").build());
+                } else if (name.contains("marshall")) {
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1614624532983-4ce03382d63d?w=900").build());
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1545454675-3531b543be5d?w=900").build());
+                } else if (name.contains("apple watch") || name.contains("garmin")) {
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1434494878577-86c23bcb06b9?w=900").build());
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=900").build());
+                } else if (name.contains("xiaomi")) {
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1565630916779-e303be97b6f5?w=900").build());
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=900").build());
+                } else if (name.contains("rog ally")) {
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1605901309584-818e25960a8f?w=900").build());
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=900").build());
+                } else if (name.contains("dyson") || name.contains("quạt")) {
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1595708684082-a173bb3a06c5?w=900").build());
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1618944847828-82e943c3babf?w=900").build());
+                } else if (name.contains("delonghi") || name.contains("cook")) {
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=900").build());
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1556911220-bff31c812dba?w=900").build());
+                } else if (name.contains("philips") || name.contains("roborock") || name.contains("hút bụi")) {
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1621972750749-0fbb1abb7736?w=900").build());
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1576082900999-1ee07d7213bf?w=900").build());
+                } else {
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=900").build());
+                    galleryImages.add(ProductImage.builder().product(p).imageUrl("https://images.unsplash.com/photo-1601445638532-3c6f6c3aa1d6?w=900").build());
+                }
+            }
+            productImageRepository.saveAll(galleryImages);
+        }
+
         Product phoneProduct = products.stream().filter(p -> p.getName().contains("Pulse Buds")).findFirst().orElse(null);
         Product laptopProduct = products.stream().filter(p -> p.getName().contains("NovaBook")).findFirst().orElse(null);
         Coupon welcomeCoupon = couponRepository.findByCode("WELCOME10").orElse(null);

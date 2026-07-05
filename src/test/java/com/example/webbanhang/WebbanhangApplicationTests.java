@@ -8,9 +8,6 @@ import org.flywaydb.core.Flyway;
 @SpringBootTest(properties = "app.seed.enabled=false")
 class WebbanhangApplicationTests {
 
-    @Autowired
-    private Flyway flyway;
-
     @Test
     void contextLoads() {
     }
