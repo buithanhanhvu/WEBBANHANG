@@ -179,32 +179,65 @@ Backend sử dụng thư viện `springdoc-openapi-starter-webmvc-ui` (v2.8.5) t
 
 ---
 
-## 4. Bộ Test API Với 8 Trường Hợp Kiểm Thử Chính
+## 4. Bộ Kiểm Thử API & Kết Quả Thực Tế (15 Kịch Bản Toàn Diện)
 
-Thầy cô yêu cầu tối thiểu **8 kịch bản kiểm thử** đại diện cho các luồng xử lý thành công (Success) và thất bại/ngoại lệ (Failure/Exception). Hệ thống đã đáp ứng theo 2 phương pháp:
+Hệ thống đã xây dựng và hoàn thành đầy đủ **15 kịch bản kiểm thử toàn diện** bao phủ toàn bộ luồng nghiệp vụ từ đăng ký, đăng nhập, phân quyền, làm mới token, giỏ hàng, áp dụng coupon, đặt hàng, quản trị sản phẩm, kiểm tra tính hợp lệ của dữ liệu (Bean Validation), quản lý sản phẩm yêu thích (Wishlist) và nghiệp vụ gửi đánh giá phức tạp.
 
-### Phương án A: Tự động hóa bằng JUnit và MockMvc
+### 4.1. Ma Trận Kịch Bản Kiểm Thử (Test Case Matrix)
 
-Dự án đã có sẵn mã nguồn kiểm thử tự động tại [ApiControllerTests.java](file:///e:/WEBBANHANG/src/test/java/com/example/webbanhang/controller/ApiControllerTests.java). Bạn có thể chạy trực tiếp bằng IDE hoặc dòng lệnh:
+Dưới đây là bảng ma trận kiểm thử chi tiết thể hiện đầy đủ các trường hợp kiểm thử đã được chạy:
 
-```bash
-./mvnw test
-```
+| STT | Mã Kịch Bản | Tên Kịch Bản Kiểm Thử | HTTP Method | Endpoint API | Dữ Liệu Đầu Vào | Kết Quả Mong Đợi (HTTP Status) | Trạng Thái |
+|:---:|:-----------|:----------------------|:-----------:|:-------------|:----------------|:------------------------------:|:----------:|
+| 1 | TC-01 | Đăng ký tài khoản mới thành công | POST | `/api/auth/register` | JSON chứa username mới, email, password... | `200 OK` (Trả về token) | **Passed** |
+| 2 | TC-02 | Đăng ký thất bại do trùng Username/Email | POST | `/api/auth/register` | Trùng username `admin` hoặc email đã có | `400 Bad Request` | **Passed** |
+| 3 | TC-03 | Đăng nhập thành công lấy JWT Token | POST | `/api/auth/login` | Đúng tài khoản & mật khẩu hợp lệ | `200 OK` (Trả về JWT + Refresh Token) | **Passed** |
+| 4 | TC-04 | Đăng nhập thất bại do sai thông tin mật khẩu | POST | `/api/auth/login` | Sai mật khẩu khách hàng | `400 Bad Request` | **Passed** |
+| 5 | TC-05 | Làm mới Access Token bằng Refresh Token | POST | `/api/auth/refresh` | Gửi kèm chuỗi `refreshToken` hợp lệ | `200 OK` (Trả về Access Token mới) | **Passed** |
+| 6 | TC-06 | Lấy danh sách sản phẩm (Lọc & Phân trang) | GET | `/api/products` | Query params: `search`, `page`, `size` | `200 OK` (Trả về mảng JSON) | **Passed** |
+| 7 | TC-07 | Thêm sản phẩm vào giỏ hàng | POST | `/api/cart/add` | Header `Authorization`, productId, quantity | `200 OK` (Trả về giỏ hàng mới) | **Passed** |
+| 8 | TC-08 | Áp dụng mã giảm giá (Coupon) thành công | POST | `/api/coupons/apply` | Header `Authorization`, mã coupon `WELCOME10` | `200 OK` (Tính lại tổng tiền & discount) | **Passed** |
+| 9 | TC-09 | Thanh toán & Đặt hàng thành công | POST | `/api/orders` | Header `Authorization`, thông tin người nhận | `200 OK` (Tạo đơn hàng, cập nhật kho) | **Passed** |
+| 10 | TC-10 | Chặn truy cập Admin Dashboard (Role CUSTOMER) | GET | `/api/admin/dashboard` | Header `Authorization` của CUSTOMER | `403 Forbidden` | **Passed** |
+| 11 | TC-11 | Admin tạo mới sản phẩm thành công | POST | `/api/admin/products` | Header `Authorization` ADMIN, thông tin product | `200 OK` (Trả về thông tin product mới) | **Passed** |
+| 12 | TC-12 | Admin tạo sản phẩm thất bại do lỗi Validation | POST | `/api/admin/products` | Tên rỗng, giá tiền âm, stock âm | `400 Bad Request` (Ràng buộc Bean) | **Passed** |
+| 13 | TC-13 | Thêm sản phẩm yêu thích (Wishlist) | POST | `/api/wishlist/{productId}` | Header `Authorization`, productId | `200 OK` (Lưu thành công) | **Passed** |
+| 14 | TC-14 | Luồng nghiệp vụ Đặt hàng -> Giao hàng -> Đánh giá | POST | `/api/reviews` | Flow: Chặn review khi chưa mua -> Giao hàng -> Đánh giá thành công | `400 Bad Request` & `200 OK` | **Passed** |
+| 15 | TC-15 | Xem và cập nhật hồ sơ cá nhân | PUT | `/api/auth/me` | Header `Authorization`, thông tin cá nhân mới | `200 OK` (Trả về profile mới) | **Passed** |
 
-Bộ test tự động hóa này thực hiện đúng 8 trường hợp:
+---
 
-1. **`registerSuccess` (Thành công):** Đăng ký tài khoản khách hàng mới hợp lệ.
-2. **`registerFailDuplicate` (Thất bại):** Đăng ký trùng tên tài khoản/email có sẵn trong hệ thống (Trả về `400 Bad Request`).
-3. **`loginSuccess` (Thành công):** Đăng nhập đúng thông tin, nhận về Access Token (JWT) và Refresh Token.
-4. **`getProductsFilteredAndPaged` (Thành công):** Lọc sản phẩm theo từ khóa và phân trang thành công.
-5. **`addToCart` (Thành công):** Khách hàng đã đăng nhập thêm sản phẩm vào giỏ hàng thành công.
-6. **`applyCoupon` (Thành công):** Áp dụng mã coupon hợp lệ trong ví và nhận chiết khấu chính xác.
-7. **`checkoutSuccess` (Thành công):** Thanh toán giỏ hàng, tạo đơn hàng thành công và cập nhật số lượng tồn kho.
-8. **`adminAccessForbidden` (Thất bại):** Tài khoản role `CUSTOMER` cố gắng gọi API quản trị `/api/admin/dashboard` (Hệ thống chặn lại và trả về `403 Forbidden`).
+### 4.2. Phương Án A: Kiểm Thử Tự Động Với JUnit & MockMvc
 
-### Phương án B: Kiểm thử thủ công bằng file REST Client
+Dự án đã tích hợp mã nguồn kiểm thử tích hợp tự động toàn diện tại [ApiControllerTests.java](file:///e:/WEBBANHANG/src/test/java/com/example/webbanhang/controller/ApiControllerTests.java).
 
-Một file [api-test-cases.http](file:///e:/WEBBANHANG/api-test-cases.http) đã được tạo sẵn ở thư mục gốc của dự án.
+* **Lệnh thực hiện chạy test:**
+  ```bash
+  ./mvnw test
+  ```
+* **Lệnh tạo báo cáo Surefire HTML:**
+  ```bash
+  ./mvnw surefire-report:report-only
+  ```
 
+#### Kết quả chạy thử nghiệm tự động:
+Toàn bộ 15 kịch bản test nghiệp vụ cùng với kiểm thử khởi tạo Spring Context đã vượt qua thành công **100% (16/16 passed)**. 
+
+Báo cáo kiểm thử trực quan được kết xuất ra file HTML dạng Surefire Report:
+![Báo cáo kết quả chạy JUnit Test](images/junit_test_results.png)
+
+---
+
+### 4.3. Phương Án B: Kiểm Thử Thủ Công & Tài Liệu Hóa OpenAPI Swagger
+
+#### 1. Tài liệu hóa API động qua Swagger UI
+Swagger UI tự động sinh tài liệu từ mã nguồn giúp dễ dàng tương tác và gọi thử các API trực tiếp:
+* **Đường dẫn truy cập:** `http://localhost:8080/swagger-ui/index.html` (khi đang chạy ứng dụng backend).
+![Tài liệu hóa API qua Swagger UI](images/swagger_ui_api.png)
+
+#### 2. Kịch bản chạy thử bằng REST Client (.http)
+Sử dụng file [api-test-cases.http](file:///e:/WEBBANHANG/api-test-cases.http) trong VS Code để gửi request trực tiếp đến server chạy local. Kết quả trả về của các API khớp chính xác với thiết kế mã lỗi nghiệp vụ:
 * **Cách sử dụng:** Cài đặt extension **REST Client** trên VS Code. Sau đó, mở file [api-test-cases.http](file:///e:/WEBBANHANG/api-test-cases.http) và nhấn vào nút **"Send Request"** ở trên mỗi API để kiểm tra phản hồi trực tiếp từ server.
-* **Danh sách test case thủ công:** bao gồm các yêu cầu đăng ký, đăng nhập, thêm giỏ hàng, chặn phân quyền Admin và chặn viết đánh giá khi chưa mua hàng (kiểm tra logic nghiệp vụ).
+* **Danh sách kịch bản:** bao gồm đăng ký, đăng nhập, xem sản phẩm, thêm giỏ hàng, chặn phân quyền Admin và chặn viết đánh giá khi chưa mua hàng (kiểm tra logic nghiệp vụ).
+
+

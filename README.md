@@ -15,9 +15,9 @@ Hệ thống được tích hợp các cơ chế bảo mật cao cấp (JWT, Goo
     *   Mô tả chi tiết các nhóm API nghiệp vụ (Auth, Catalog, Cart, Order, Review, Wishlist, Admin).
     *   Lược đồ CSDL chuẩn hóa (chuẩn **3NF**) kèm biểu đồ mối quan hệ thực thể **ERD** dưới dạng mã Mermaid.
     *   Hướng dẫn chạy thử chi tiết.
-*   **Bộ Test API Tối Thiểu 8 Trường Hợp:** 
-    *   **Test tự động hóa (JUnit & MockMvc):** Mã nguồn nằm tại **[ApiControllerTests.java](file:///e:/WEBBANHANG/src/test/java/com/example/webbanhang/controller/ApiControllerTests.java)**.
-    *   **Test thủ công bằng REST Client:** File **[api-test-cases.http](file:///e:/WEBBANHANG/api-test-cases.http)** nằm ở thư mục gốc chứa sẵn 8 kịch bản (4 thành công, 4 thất bại với các mã lỗi mong đợi cụ thể).
+*   **Bộ Test API Toàn Diện 15 Kịch Bản:** 
+    *   **Test tự động hóa (JUnit & MockMvc):** Mã nguồn nằm tại **[ApiControllerTests.java](file:///e:/WEBBANHANG/src/test/java/com/example/webbanhang/controller/ApiControllerTests.java)** với **15 kịch bản** (16 test cases bao gồm context load) kiểm thử toàn diện tất cả các luồng nghiệp vụ.
+    *   **Test thủ công bằng REST Client:** File **[api-test-cases.http](file:///e:/WEBBANHANG/api-test-cases.http)** nằm ở thư mục gốc chứa các kịch bản gửi request trực quan qua REST Client.
 *   **Tài liệu Swagger / OpenAPI:** Tích hợp trực tiếp qua thư viện `springdoc-openapi`.
     *   **Swagger UI (Web trực quan):** `http://localhost:8080/swagger-ui/index.html` (khi server đang chạy).
     *   **OpenAPI JSON Specification:** `http://localhost:8080/v3/api-docs`.
