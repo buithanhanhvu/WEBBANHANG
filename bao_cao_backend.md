@@ -144,22 +144,70 @@ erDiagram
         Long user_id FK
         Long product_id FK
     }
+    PRICE_HISTORY {
+        Long id PK
+        Long product_id FK
+        Decimal old_price
+        Decimal new_price
+        Int old_discount
+        Int new_discount
+        Timestamp changed_at
+    }
+    RECYCLE_BIN {
+        Long id PK
+        String entity_type
+        Long entity_id
+        String display_name
+        String original_data
+        Timestamp deleted_at
+    }
+    PASSWORD_RESETS {
+        String email PK
+        String otp_code
+        Timestamp expiry_time
+    }
+    REFRESH_TOKENS {
+        Long id PK
+        Long user_id FK
+        String token UK
+        Timestamp expiry_date
+    }
 
     USERS ||--o{ ORDERS : "places"
     USERS ||--o{ CART_ITEMS : "has"
     USERS ||--o{ REVIEWS : "writes"
     USERS ||--o{ USER_COUPONS : "collects"
     USERS ||--o{ WISHLISTS : "saves"
+    USERS ||--o{ REFRESH_TOKENS : "owns"
     CATEGORIES ||--o{ PRODUCTS : "contains"
     PRODUCTS ||--o{ PRODUCT_IMAGES : "has"
     PRODUCTS ||--o{ CART_ITEMS : "added_to"
     PRODUCTS ||--o{ ORDER_ITEMS : "ordered_in"
     PRODUCTS ||--o{ REVIEWS : "evaluated_in"
     PRODUCTS ||--o{ WISHLISTS : "liked"
+    PRODUCTS ||--o{ PRICE_HISTORY : "tracks"
     ORDERS ||--o{ ORDER_ITEMS : "contains"
     COUPONS ||--o{ ORDERS : "applied_to"
     COUPONS ||--o{ USER_COUPONS : "collected_in"
 ```
+
+### Danh sách 16 bảng trong Cơ sở dữ liệu:
+1.  **`users`**: Quản lý tài khoản người dùng (Khách hàng và Admin).
+2.  **`categories`**: Quản lý các danh mục sản phẩm.
+3.  **`products`**: Quản lý thông tin chi tiết và số lượng tồn kho của sản phẩm.
+4.  **`product_images`**: Lưu các hình ảnh phụ bổ sung cho sản phẩm (quan hệ 1-N với `products`).
+5.  **`cart_items`**: Quản lý các sản phẩm trong giỏ hàng tạm thời của khách hàng.
+6.  **`orders`**: Quản lý thông tin chung của đơn hàng (tổng tiền, giảm giá, địa chỉ giao hàng, trạng thái).
+7.  **`order_items`**: Lưu chi tiết các mặt hàng, số lượng và giá cụ thể tại thời điểm mua trong đơn hàng.
+8.  **`reviews`**: Lưu đánh giá số sao (1-5) và bình luận từ khách hàng đã mua sản phẩm.
+9.  **`coupons`**: Quản lý các mã giảm giá toàn hệ thống.
+10. **`user_coupons`**: Ví lưu trữ các mã giảm giá cá nhân mà khách hàng đã thu thập/sưu tầm được.
+11. **`wishlists`**: Lưu trữ danh sách các sản phẩm yêu thích của khách hàng.
+12. **`price_history`**: Ghi lại lịch sử các lần thay đổi giá của sản phẩm để phục vụ tính năng gửi thông báo khi có sản phẩm yêu thích được giảm giá.
+13. **`recycle_bin`**: Thùng rác hệ thống dùng lưu trữ các thực thể bị xóa mềm dưới dạng JSON nhằm hỗ trợ chức năng khôi phục.
+14. **`password_resets`**: Quản lý mã OTP và thời gian hết hạn phục vụ quy trình lấy lại mật khẩu.
+15. **`refresh_tokens`**: Lưu trữ Refresh Token phục vụ cơ chế tự động làm mới JWT Access Token.
+16. **`flyway_schema_history`**: Bảng hệ thống được tạo tự động bởi Flyway để giám sát phiên bản cấu trúc database.
 
 * **Các Migration Script:** Được tổ chức bằng Flyway tại `src/main/resources/db/migration/`:
   * [V1__init_schema.sql](file:///e:/WEBBANHANG/src/main/resources/db/migration/V1__init_schema.sql): Khởi tạo lược đồ các bảng, chỉ định rõ khóa ngoại (`FOREIGN KEY`) và ràng buộc duy nhất (`UNIQUE KEY`).

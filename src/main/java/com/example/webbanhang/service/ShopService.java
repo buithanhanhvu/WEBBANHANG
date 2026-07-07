@@ -30,7 +30,7 @@ public class ShopService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final ReviewRepository reviewRepository;
-    private final RankRepository rankRepository;
+
     private final WishlistRepository wishlistRepository;
     private final RecycleBinService recycleBinService;
     private RealtimeService realtimeService;
@@ -47,7 +47,7 @@ public class ShopService {
                        OrderRepository orderRepository,
                        OrderItemRepository orderItemRepository,
                        ReviewRepository reviewRepository,
-                       RankRepository rankRepository,
+
                        WishlistRepository wishlistRepository,
                        RecycleBinService recycleBinService) {
         this.userRepository = userRepository;
@@ -59,7 +59,7 @@ public class ShopService {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.reviewRepository = reviewRepository;
-        this.rankRepository = rankRepository;
+
         this.wishlistRepository = wishlistRepository;
         this.recycleBinService = recycleBinService;
     }
@@ -677,20 +677,7 @@ public class ShopService {
         userRepository.save(u);
     }
 
-    public List<Map<String, Object>> getRanks() {
-        return rankRepository.findAllByOrderByMinSpentAsc().stream().map(r -> {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("id", r.getId());
-            m.put("name", r.getName());
-            m.put("subtitle", r.getSubtitle());
-            m.put("icon", r.getIcon());
-            m.put("description", r.getDescription());
-            m.put("min_spent", r.getMinSpent());
-            m.put("color", r.getColor());
-            m.put("css_class", r.getCssClass());
-            return m;
-        }).toList();
-    }
+
 
     public Map<String, Object> dashboard(String period) {
         Map<String, Object> result = new LinkedHashMap<>();
@@ -1203,14 +1190,5 @@ public class ShopService {
         return result;
     }
 
-    @Transactional
-    public void updateRankMinSpent(String id, BigDecimal minSpent) {
-        if (minSpent == null || minSpent.compareTo(BigDecimal.ZERO) < 0) {
-            throw new BadRequestException("Số tiền tích lũy tối thiểu không được âm");
-        }
-        Rank r = rankRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Rank not found"));
-        r.setMinSpent(minSpent);
-        rankRepository.save(r);
-    }
+
 }

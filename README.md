@@ -79,7 +79,7 @@ Hệ thống được tích hợp các cơ chế bảo mật cao cấp (JWT, Goo
 
 ## 🗄️ Thiết Kế Cơ Sở Dữ Liệu (Database Schema)
 
-Hệ thống sử dụng các bảng liên kết chặt chẽ trong MySQL:
+Hệ thống sử dụng 16 bảng (bao gồm 15 bảng nghiệp vụ và 1 bảng hệ thống của Flyway) được liên kết chặt chẽ trong MySQL:
 
 ```mermaid
 erDiagram
@@ -88,6 +88,7 @@ erDiagram
     users ||--o{ user_coupons : "thu thập"
     users ||--o{ orders : "đặt"
     users ||--o{ reviews : "viết"
+    users ||--o{ refresh_tokens : "sở hữu"
     
     categories ||--o{ products : "phân loại"
     
@@ -96,12 +97,31 @@ erDiagram
     products ||--o{ price_history : "lưu lịch sử"
     products ||--o{ order_items : "chi tiết"
     products ||--o{ reviews : "nhận"
+    products ||--o{ product_images : "có"
     
     coupons ||--o{ user_coupons : "được lưu"
     coupons ||--o{ orders : "áp dụng"
     
     orders ||--o{ order_items : "chứa"
 ```
+
+### Danh sách 16 bảng trong Cơ sở dữ liệu:
+1.  **`users`**: Quản lý tài khoản người dùng (Khách hàng và Admin).
+2.  **`categories`**: Quản lý các danh mục sản phẩm.
+3.  **`products`**: Quản lý thông tin chi tiết và số lượng tồn kho của sản phẩm.
+4.  **`product_images`**: Lưu các hình ảnh phụ bổ sung cho sản phẩm (quan hệ 1-N với `products`).
+5.  **`cart_items`**: Quản lý các sản phẩm trong giỏ hàng tạm thời của khách hàng.
+6.  **`orders`**: Quản lý thông tin chung của đơn hàng (tổng tiền, giảm giá, địa chỉ giao hàng, trạng thái).
+7.  **`order_items`**: Lưu chi tiết các mặt hàng, số lượng và giá cụ thể tại thời điểm mua trong đơn hàng.
+8.  **`reviews`**: Lưu đánh giá số sao (1-5) và bình luận từ khách hàng đã mua sản phẩm.
+9.  **`coupons`**: Quản lý các mã giảm giá toàn hệ thống.
+10. **`user_coupons`**: Ví lưu trữ các mã giảm giá cá nhân mà khách hàng đã thu thập/sưu tầm được.
+11. **`wishlists`**: Lưu trữ danh sách các sản phẩm yêu thích của khách hàng.
+12. **`price_history`**: Ghi lại lịch sử các lần thay đổi giá của sản phẩm để phục vụ tính năng gửi thông báo khi có sản phẩm yêu thích được giảm giá.
+13. **`recycle_bin`**: Thùng rác hệ thống dùng lưu trữ các thực thể bị xóa mềm dưới dạng JSON nhằm hỗ trợ chức năng khôi phục.
+14. **`password_resets`**: Quản lý mã OTP và thời gian hết hạn phục vụ quy trình lấy lại mật khẩu.
+15. **`refresh_tokens`**: Lưu trữ Refresh Token phục vụ cơ chế tự động làm mới JWT Access Token.
+16. **`flyway_schema_history`**: Bảng hệ thống được tạo tự động bởi Flyway để giám sát phiên bản cấu trúc database.
 
 ---
 

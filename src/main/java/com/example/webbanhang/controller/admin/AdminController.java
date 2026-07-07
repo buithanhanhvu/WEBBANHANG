@@ -221,14 +221,7 @@ public class AdminController {
         return ApiResponse.ok(shopService.getAdminRevenueReport(period));
     }
 
-    @PutMapping("/ranks/{id}")
-    @Operation(summary = "Cập nhật số tiền chi tiêu tối thiểu của một hạng thành viên")
-    public ApiResponse<Void> updateRank(@PathVariable String id, @RequestBody Map<String, Object> body, HttpServletRequest request) {
-        currentUserService.requireAdmin(request);
-        java.math.BigDecimal minSpent = new java.math.BigDecimal(String.valueOf(body.get("minSpent")));
-        shopService.updateRankMinSpent(id, minSpent);
-        return ApiResponse.ok("Updated", null);
-    }
+
 
     // ── Recycle Bin ──
 

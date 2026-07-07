@@ -15,7 +15,7 @@ import java.util.List;
 @ConditionalOnProperty(name = "app.seed.enabled", havingValue = "true", matchIfMissing = true)
 public class DatabaseSeeder implements CommandLineRunner {
 
-    private final RankRepository rankRepository;
+
     private final CategoryRepository categoryRepository;
     private final ProductRepository productRepository;
     private final ProductImageRepository productImageRepository;
@@ -25,7 +25,7 @@ public class DatabaseSeeder implements CommandLineRunner {
     private final PasswordEncoder passwordEncoder;
 
     public DatabaseSeeder(
-            RankRepository rankRepository,
+
             CategoryRepository categoryRepository,
             ProductRepository productRepository,
             ProductImageRepository productImageRepository,
@@ -33,7 +33,7 @@ public class DatabaseSeeder implements CommandLineRunner {
             CouponRepository couponRepository,
             OrderRepository orderRepository,
             PasswordEncoder passwordEncoder) {
-        this.rankRepository = rankRepository;
+
         this.categoryRepository = categoryRepository;
         this.productRepository = productRepository;
         this.productImageRepository = productImageRepository;
@@ -45,61 +45,7 @@ public class DatabaseSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        // 1. Seed Ranks
-        if (rankRepository.count() == 0) {
-            rankRepository.saveAll(List.of(
-                Rank.builder()
-                        .id("shopper")
-                        .name("Shopper")
-                        .subtitle("Người qua đường")
-                        .icon("🛍️")
-                        .description("Mới chân ướt chân ráo — mọi hành trình đều bắt đầu từ đây.")
-                        .minSpent(BigDecimal.ZERO)
-                        .color("#334155")
-                        .cssClass("rank-shopper")
-                        .build(),
-                Rank.builder()
-                        .id("shark")
-                        .name("Shark")
-                        .subtitle("Cá mập tập sự")
-                        .icon("🦈")
-                        .description("Đã bắt đầu chi tiêu mạnh tay — bản năng thị trường đang thức tỉnh.")
-                        .minSpent(new BigDecimal("500000"))
-                        .color("#93c5fd")
-                        .cssClass("rank-shark")
-                        .build(),
-                Rank.builder()
-                        .id("angel")
-                        .name("Angel Investor")
-                        .subtitle("Nhà đầu tư thiên thần")
-                        .icon("👼")
-                        .description("Chi tiêu hào phóng, tầm nhìn xa. Những deal tốt không bao giờ bỏ qua.")
-                        .minSpent(new BigDecimal("2000000"))
-                        .color("#c4b5fd")
-                        .cssClass("rank-angel")
-                        .build(),
-                Rank.builder()
-                        .id("unicorn")
-                        .name("Unicorn")
-                        .subtitle("Kỳ lân công nghệ")
-                        .icon("🦄")
-                        .description("Hiếm có khó tìm. Danh hiệu lấp lánh dành cho những tâm hồn mua sắm đặc biệt.")
-                        .minSpent(new BigDecimal("5000000"))
-                        .color("#f0abfc")
-                        .cssClass("rank-unicorn")
-                        .build(),
-                Rank.builder()
-                        .id("tycoon")
-                        .name("Tycoon")
-                        .subtitle("Trùm tài phiệt")
-                        .icon("💰")
-                        .description("Vàng chảy theo bước chân. Chỉ những tay chi tiêu đẳng cấp mới chạm tới đây.")
-                        .minSpent(new BigDecimal("15000000"))
-                        .color("#fbbf24")
-                        .cssClass("rank-tycoon")
-                        .build()
-            ));
-        }
+
 
         // 2. Seed Categories
         if (categoryRepository.count() == 0) {

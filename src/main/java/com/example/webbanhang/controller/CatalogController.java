@@ -81,9 +81,5 @@ public class CatalogController {
         return ApiResponse.ok(catalogService.priceHistory(id));
     }
 
-    @GetMapping("/ranks")
-    @Operation(summary = "Lấy danh sách phân hạng thành viên")
-    public ApiResponse<List<Map<String, Object>>> ranks() {
-        return ApiResponse.ok(shopService.getRanks());
-    }
+
 }

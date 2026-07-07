@@ -103,16 +103,7 @@ export interface Review {
   created_at: string;
 }
 
-export interface Rank {
-  id: string;
-  name: string;
-  subtitle?: string;
-  icon?: string;
-  description?: string;
-  min_spent: number;
-  color?: string;
-  css_class?: string;
-}
+
 
 export interface PriceHistory {
   id: number;

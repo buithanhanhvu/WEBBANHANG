@@ -3,7 +3,7 @@ package com.example.webbanhang.service;
 import com.example.webbanhang.domain.Category;
 import com.example.webbanhang.domain.PriceHistory;
 import com.example.webbanhang.domain.Product;
-import com.example.webbanhang.domain.Rank;
+
 import com.example.webbanhang.dto.Requests.CategoryRequest;
 import com.example.webbanhang.dto.Requests.ProductRequest;
 import com.example.webbanhang.exception.BadRequestException;
@@ -11,7 +11,7 @@ import com.example.webbanhang.exception.ResourceNotFoundException;
 import com.example.webbanhang.repository.CategoryRepository;
 import com.example.webbanhang.repository.PriceHistoryRepository;
 import com.example.webbanhang.repository.ProductRepository;
-import com.example.webbanhang.repository.RankRepository;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.springframework.data.domain.PageRequest;
@@ -26,7 +26,7 @@ public class CatalogService {
     private final CategoryRepository categoryRepository;
     private final ProductRepository productRepository;
     private final PriceHistoryRepository priceHistoryRepository;
-    private final RankRepository rankRepository;
+
     private final RecycleBinService recycleBinService;
 
     @PersistenceContext
@@ -35,12 +35,12 @@ public class CatalogService {
     public CatalogService(CategoryRepository categoryRepository,
                           ProductRepository productRepository,
                           PriceHistoryRepository priceHistoryRepository,
-                          RankRepository rankRepository,
+
                           RecycleBinService recycleBinService) {
         this.categoryRepository = categoryRepository;
         this.productRepository = productRepository;
         this.priceHistoryRepository = priceHistoryRepository;
-        this.rankRepository = rankRepository;
+
         this.recycleBinService = recycleBinService;
     }
 
