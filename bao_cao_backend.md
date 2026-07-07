@@ -288,4 +288,64 @@ Sử dụng file [api-test-cases.http](file:///e:/WEBBANHANG/api-test-cases.http
 * **Cách sử dụng:** Cài đặt extension **REST Client** trên VS Code. Sau đó, mở file [api-test-cases.http](file:///e:/WEBBANHANG/api-test-cases.http) và nhấn vào nút **"Send Request"** ở trên mỗi API để kiểm tra phản hồi trực tiếp từ server.
 * **Danh sách kịch bản:** bao gồm đăng ký, đăng nhập, xem sản phẩm, thêm giỏ hàng, chặn phân quyền Admin và chặn viết đánh giá khi chưa mua hàng (kiểm tra logic nghiệp vụ).
 
+---
+
+## 5. Hình Ảnh Minh Họa Các Chức Năng Hệ Thống (Màn Hình Giao Diện)
+
+Dưới đây là hình ảnh minh họa thực tế các chức năng chính của hệ thống thương mại điện tử AstraShop được ghi lại khi vận hành:
+
+### 5.1. Phân Hệ Khách Hàng (Customer Interface)
+
+#### **Hình 3.1: Giao diện đăng nhập**
+Giao diện đăng nhập tối giản, hiện đại tích hợp xác thực JWT Token và đăng nhập nhanh bằng tài khoản Google.
+![Hình 3.1: Giao diện đăng nhập](images/report/hinh3_1_login.png)
+
+#### **Hình 3.2: Trang chủ**
+Trang chủ AstraShop hiển thị banner nổi bật, các danh mục sản phẩm chính và danh sách sản phẩm nổi bật thu hút người dùng.
+![Hình 3.2: Trang chủ](images/report/hinh3_2_trang_chu.png)
+
+#### **Hình 3.3: Danh sách sản phẩm**
+Trang cửa hàng hiển thị danh sách sản phẩm với các bộ lọc thông minh (danh mục, khoảng giá, sắp xếp) và thanh tìm kiếm trực quan.
+![Hình 3.3: Danh sách sản phẩm](images/report/hinh3_3_danh_sach_san_pham.png)
+
+#### **Hình 3.4: Chi tiết sản phẩm**
+Trang thông tin chi tiết của một sản phẩm bao gồm bộ sưu tập hình ảnh, đánh giá trung bình, giá bán, mô tả chi tiết và phần bình luận đánh giá.
+![Hình 3.4: Chi tiết sản phẩm](images/report/hinh3_4_chi_tiet_san_pham.png)
+
+#### **Hình 3.5: Giỏ hàng**
+Giao diện giỏ hàng hiển thị danh sách các sản phẩm đã chọn, số lượng và tổng tiền tạm tính, cho phép cập nhật nhanh số lượng sản phẩm.
+![Hình 3.5: Giỏ hàng](images/report/hinh3_5_gio_hang.png)
+
+#### **Hình 3.6: Thanh toán**
+Màn hình thanh toán hỗ trợ điền thông tin người nhận, ghi chú và tích hợp ô chọn nhanh mã giảm giá (Voucher) khả dụng của người dùng.
+![Hình 3.6: Thanh toán](images/report/hinh3_6_thanh_toan.png)
+
+#### **Hình 3.7: Wishlist**
+Danh sách lưu trữ các sản phẩm yêu thích của khách hàng, tích hợp tính năng tự động hiển thị thông báo giảm giá nếu sản phẩm có sự thay đổi giá trong 7 ngày gần nhất.
+![Hình 3.7: Wishlist](images/report/hinh3_7_wishlist.png)
+
+---
+
+### 5.2. Phân Hệ Quản Trị Viên (Admin Interface)
+
+#### **Hình 3.8: Dashboard Admin**
+Bảng điều khiển trung tâm dành cho Admin hiển thị thống kê tổng quan doanh thu, số lượng đơn hàng, biểu đồ tăng trưởng và danh sách sản phẩm bán chạy.
+![Hình 3.8: Dashboard Admin](images/report/hinh3_8_dashboard_admin.png)
+
+#### **Hình 3.9: Quản lý sản phẩm**
+Màn hình CRUD sản phẩm cho phép Admin thêm, sửa, xóa mềm sản phẩm, cập nhật tồn kho và hình ảnh sản phẩm.
+![Hình 3.9: Quản lý sản phẩm](images/report/hinh3_9_quan_ly_san_pham.png)
+
+#### **Hình 3.10: Quản lý đơn hàng**
+Giao diện quản lý danh sách đơn hàng toàn hệ thống giúp Admin theo dõi và cập nhật trạng thái đơn hàng (Duyệt đơn, Đang giao, Đã giao, Hủy đơn).
+![Hình 3.10: Quản lý đơn hàng](images/report/hinh3_10_quan_ly_don_hang.png)
+
+#### **Hình 3.11: Quản lý Voucher**
+Trang thiết lập mã giảm giá giúp Admin tạo mới các mã giảm giá có giới hạn số lần sử dụng và thời hạn hiệu lực cụ thể.
+![Hình 3.11: Quản lý Voucher](images/report/hinh3_11_quan_ly_voucher.png)
+
+#### **Hình 3.12: Recycle Bin (Thùng rác)**
+Thùng rác hệ thống lưu trữ các đối tượng bị xóa mềm (Sản phẩm, Danh mục, Người dùng, Voucher) dưới dạng JSON, cho phép Admin khôi phục nguyên trạng hoặc xóa vĩnh viễn.
+![Hình 3.12: Recycle Bin](images/report/hinh3_12_recycle_bin.png)
+
 
