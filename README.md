@@ -79,7 +79,9 @@ Hệ thống được tích hợp các cơ chế bảo mật cao cấp (JWT, Goo
 
 ## 🗄️ Thiết Kế Cơ Sở Dữ Liệu (Database Schema)
 
-Hệ thống sử dụng các bảng liên kết chặt chẽ trong MySQL:
+Cơ sở dữ liệu MySQL của hệ thống được thiết kế chuẩn hóa và liên kết chặt chẽ để hỗ trợ các chức năng mua sắm, quản lý giỏ hàng, thanh toán và quản trị nâng cao.
+
+### 1. Sơ đồ mối quan hệ thực thể (Entity Relationship Diagram - ERD)
 
 ```mermaid
 erDiagram
@@ -88,9 +90,11 @@ erDiagram
     users ||--o{ user_coupons : "thu thập"
     users ||--o{ orders : "đặt"
     users ||--o{ reviews : "viết"
+    users ||--o{ refresh_tokens : "sở hữu"
     
     categories ||--o{ products : "phân loại"
     
+    products ||--o{ product_images : "có"
     products ||--o{ cart_items : "trong"
     products ||--o{ wishlists : "trong"
     products ||--o{ price_history : "lưu lịch sử"
@@ -102,6 +106,30 @@ erDiagram
     
     orders ||--o{ order_items : "chứa"
 ```
+
+### 2. Mô tả chi tiết chức năng của các bảng dữ liệu
+
+Hệ thống bao gồm **16 bảng** được chia thành các nhóm chức năng chính như sau:
+
+| STT | Tên Bảng | Ý Nghĩa / Chức Năng |
+| :--- | :--- | :--- |
+| 1 | **`users`** | Lưu trữ thông tin tài khoản người dùng (Khách hàng & Quản trị viên), vai trò (`CUSTOMER`/`ADMIN`), trạng thái (`ACTIVE`/`BANNED`), thông tin cá nhân và mật khẩu băm BCrypt. |
+| 2 | **`categories`** | Danh mục sản phẩm (ví dụ: Điện thoại, Laptop, Phụ kiện...), hỗ trợ phân loại và lọc tìm kiếm trên giao diện. |
+| 3 | **`products`** | Thông tin chi tiết sản phẩm: tên, giá bán, số lượng tồn kho, thương hiệu, mức giảm giá và liên kết khóa ngoại tới bảng danh mục. |
+| 4 | **`product_images`** | Bộ sưu tập ảnh phụ (gallery) của sản phẩm, giúp hiển thị nhiều góc chụp khác nhau của sản phẩm. |
+| 5 | **`price_history`** | Lịch sử thay đổi giá bán/phần trăm giảm giá của sản phẩm, hỗ trợ phân tích xu hướng giá và thông báo giảm giá cho khách hàng. |
+| 6 | **`cart_items`** | Giỏ hàng tạm thời của khách hàng, lưu trữ danh sách sản phẩm và số lượng tương ứng trước khi tiến hành thanh toán. |
+| 7 | **`wishlists`** | Danh sách sản phẩm yêu thích được lưu bởi khách hàng để theo dõi tiện lợi. |
+| 8 | **`coupons`** | Thông tin các mã giảm giá (voucher) do hệ thống hoặc Admin phát hành (mã code, hạn dùng, số lượt sử dụng tối đa). |
+| 9 | **`user_coupons`** | Ví voucher cá nhân, lưu giữ các mã giảm giá khách hàng đã thu thập được để sử dụng lúc thanh toán. |
+| 10 | **`orders`** | Đơn hàng tổng quát: thông tin người nhận, địa chỉ giao hàng, tổng tiền, tiền giảm giá và trạng thái đơn hàng (`PENDING`, `DELIVERED`, `CANCELLED`...). |
+| 11 | **`order_items`** | Chi tiết từng sản phẩm trong đơn hàng (giá bán và số lượng tại thời điểm mua), đảm bảo tính toàn vẹn của hóa đơn khi giá sản phẩm thay đổi sau này. |
+| 12 | **`reviews`** | Đánh giá và bình luận về sản phẩm (đánh giá sao từ 1 đến 5), ràng buộc logic chỉ cho phép khách hàng đánh giá sau khi đã mua sản phẩm đó. |
+| 13 | **`recycle_bin`** | Thùng rác hệ thống lưu trữ các dữ liệu đã xóa mềm (Soft Delete) dưới dạng chuỗi JSON, cho phép Admin khôi phục nhanh (User, Product, Category, Coupon). |
+| 14 | **`refresh_tokens`** | Quản lý các Token gia hạn hỗ trợ hệ thống tự động làm mới JWT Access Token ngắn hạn mà người dùng không cần đăng nhập lại. |
+| 15 | **`password_resets`** | Lưu trữ mã xác thực OTP dùng một lần và thời hạn hiệu lực để phục vụ tính năng "Quên mật khẩu". |
+| 16 | **`flyway_schema_history`** | Bảng hệ thống tự động được tạo bởi thư viện Flyway để ghi nhận lịch sử nâng cấp/di chuyển schema, đảm bảo tính đồng bộ cấu trúc DB giữa local và production. |
+
 
 ---
 

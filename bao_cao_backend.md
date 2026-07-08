@@ -144,18 +144,48 @@ erDiagram
         Long user_id FK
         Long product_id FK
     }
+    PRICE_HISTORY {
+        Long id PK
+        Long product_id FK
+        Decimal old_price
+        Decimal new_price
+        Int old_discount
+        Int new_discount
+        Timestamp changed_at
+    }
+    REFRESH_TOKENS {
+        Long id PK
+        Long user_id FK
+        String token UK
+        Timestamp expiry_date
+    }
+    PASSWORD_RESETS {
+        String email PK
+        String otp_code
+        Timestamp expiry_time
+    }
+    RECYCLE_BIN {
+        Long id PK
+        String entity_type
+        Long entity_id
+        String display_name
+        String original_data
+        Timestamp deleted_at
+    }
 
     USERS ||--o{ ORDERS : "places"
     USERS ||--o{ CART_ITEMS : "has"
     USERS ||--o{ REVIEWS : "writes"
     USERS ||--o{ USER_COUPONS : "collects"
     USERS ||--o{ WISHLISTS : "saves"
+    USERS ||--o{ REFRESH_TOKENS : "has"
     CATEGORIES ||--o{ PRODUCTS : "contains"
     PRODUCTS ||--o{ PRODUCT_IMAGES : "has"
     PRODUCTS ||--o{ CART_ITEMS : "added_to"
     PRODUCTS ||--o{ ORDER_ITEMS : "ordered_in"
     PRODUCTS ||--o{ REVIEWS : "evaluated_in"
     PRODUCTS ||--o{ WISHLISTS : "liked"
+    PRODUCTS ||--o{ PRICE_HISTORY : "tracks"
     ORDERS ||--o{ ORDER_ITEMS : "contains"
     COUPONS ||--o{ ORDERS : "applied_to"
     COUPONS ||--o{ USER_COUPONS : "collected_in"
