@@ -172,6 +172,18 @@ erDiagram
         String original_data
         Timestamp deleted_at
     }
+    FLYWAY_SCHEMA_HISTORY {
+        Int installed_rank PK
+        String version
+        String description
+        String type
+        String script
+        Int checksum
+        String installed_by
+        Timestamp installed_on
+        Int execution_time
+        Boolean success
+    }
 
     USERS ||--o{ ORDERS : "places"
     USERS ||--o{ CART_ITEMS : "has"
@@ -179,6 +191,9 @@ erDiagram
     USERS ||--o{ USER_COUPONS : "collects"
     USERS ||--o{ WISHLISTS : "saves"
     USERS ||--o{ REFRESH_TOKENS : "has"
+    USERS ||--o{ PASSWORD_RESETS : "requests_reset"
+    USERS ||--o{ RECYCLE_BIN : "manages_soft_delete"
+    USERS ||--o{ FLYWAY_SCHEMA_HISTORY : "tracks_migrations"
     CATEGORIES ||--o{ PRODUCTS : "contains"
     PRODUCTS ||--o{ PRODUCT_IMAGES : "has"
     PRODUCTS ||--o{ CART_ITEMS : "added_to"

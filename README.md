@@ -91,6 +91,9 @@ erDiagram
     users ||--o{ orders : "đặt"
     users ||--o{ reviews : "viết"
     users ||--o{ refresh_tokens : "sở hữu"
+    users ||--o{ password_resets : "yêu cầu OTP"
+    users ||--o{ recycle_bin : "quản lý xóa mềm"
+    users ||--o{ flyway_schema_history : "lịch sử migration"
     
     categories ||--o{ products : "phân loại"
     
