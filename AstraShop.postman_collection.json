@@ -1,0 +1,491 @@
+{
+	"info": {
+		"_postman_id": "d8a1c92a-fa63-47a8-b648-fb2dc8c4c7c8",
+		"name": "AstraShop API Testing",
+		"description": "Bộ kiểm thử API nâng cao gồm 13 trường hợp (8 thành công, 5 thất bại) cho hệ thống AstraShop (Spring Boot + MySQL)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "I. CÁC TRƯỜNG HỢP THÀNH CÔNG (SUCCESS CASES)",
+			"item": [
+				{
+					"name": "1. [Thành công] Đăng ký khách hàng mới",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"customer_test_postman\",\n  \"email\": \"customer_test_postman@gmail.com\",\n  \"password\": \"Password123\",\n  \"fullName\": \"Khách Hàng Thử Nghiệm Postman\",\n  \"phone\": \"0987654321\",\n  \"address\": \"123 Đường B, Hồ Chí Minh\"\n}"
+						},
+						"url": {
+							"raw": "{{host}}/api/auth/register",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"register"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "2. [Thành công] Đăng nhập & Lấy Token tự động",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData && jsonData.data && jsonData.data.token) {",
+									"    pm.collectionVariables.set(\"token\", jsonData.data.token);",
+									"    console.log(\"Đã lưu token tự động: \" + jsonData.data.token);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"usernameOrEmail\": \"customer_test_postman\",\n  \"password\": \"Password123\"\n}"
+						},
+						"url": {
+							"raw": "{{host}}/api/auth/login",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "3. [Thành công] Xem thông tin chi tiết một sản phẩm",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{host}}/api/products/1",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"products",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "4. [Thành công] Thêm sản phẩm vào giỏ hàng",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"productId\": 1,\n  \"quantity\": 2\n}"
+						},
+						"url": {
+							"raw": "{{host}}/api/cart/add",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"cart",
+								"add"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "5. [Thành công] Áp dụng mã giảm giá (Voucher)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"WELCOME10\"\n}"
+						},
+						"url": {
+							"raw": "{{host}}/api/coupons/apply",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"coupons",
+								"apply"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "6. [Thành công] Đặt hàng (Thanh toán)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"couponCode\": \"\",\n  \"shippingName\": \"Người nhận Postman\",\n  \"shippingAddress\": \"456 Đường CMT8, Quận 3, HCM\",\n  \"shippingPhone\": \"0987654321\",\n  \"note\": \"Giao hàng giờ hành chính\"\n}"
+						},
+						"url": {
+							"raw": "{{host}}/api/orders",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"orders"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "7. [Thành công] Admin Đăng nhập & Lấy Token Admin tự động",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData && jsonData.data && jsonData.data.token) {",
+									"    pm.collectionVariables.set(\"adminToken\", jsonData.data.token);",
+									"    console.log(\"Đã lưu token admin tự động: \" + jsonData.data.token);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"usernameOrEmail\": \"admin\",\n  \"password\": \"admin123\"\n}"
+						},
+						"url": {
+							"raw": "{{host}}/api/auth/login",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "8. [Thành công] Admin thêm sản phẩm mới",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{adminToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Sản phẩm Junit Postman Test\",\n  \"description\": \"Mô tả sản phẩm tạo tự động qua Postman\",\n  \"price\": 149000,\n  \"stock\": 30,\n  \"imageUrl\": \"demo_product.png\",\n  \"categoryId\": 1,\n  \"featured\": true,\n  \"discountPercent\": 0,\n  \"brand\": \"AdminBrand\",\n  \"images\": []\n}"
+						},
+						"url": {
+							"raw": "{{host}}/api/admin/products",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"products"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "II. CÁC TRƯỜNG HỢP THẤT BẠI (FAILURE/EXCEPTION CASES)",
+			"item": [
+				{
+					"name": "9. [Thất bại] Đăng ký trùng tên đăng nhập đã tồn tại",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"admin\",\n  \"email\": \"admin@shop.local\",\n  \"password\": \"Password123\",\n  \"fullName\": \"Admin Fake\",\n  \"phone\": \"0987654321\",\n  \"address\": \"Hanoi\"\n}"
+						},
+						"url": {
+							"raw": "{{host}}/api/auth/register",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"register"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "10. [Thất bại] Đăng nhập sai mật khẩu",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"usernameOrEmail\": \"customer_test_postman\",\n  \"password\": \"SaiMatKhau123\"\n}"
+						},
+						"url": {
+							"raw": "{{host}}/api/auth/login",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "11. [Thất bại] Thêm sản phẩm vào giỏ khi chưa đăng nhập",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"productId\": 1,\n  \"quantity\": 1\n}"
+						},
+						"url": {
+							"raw": "{{host}}/api/cart/add",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"cart",
+								"add"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "12. [Thất bại] Khách hàng thường truy cập trang Admin Dashboard",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{host}}/api/admin/dashboard",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"dashboard"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "13. [Thất bại] Đánh giá sản phẩm chưa mua hoặc chưa giao thành công",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"productId\": 3,\n  \"rating\": 5,\n  \"comment\": \"Sản phẩm rất tốt nhưng tôi chưa mua!\"\n}"
+						},
+						"url": {
+							"raw": "{{host}}/api/reviews",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"reviews"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "host",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "adminToken",
+			"value": "",
+			"type": "string"
+		}
+	]
+}

@@ -1,14 +1,15 @@
 ### -------------------------------------------------------------
-### BỘ KIỂM THỬ API CHÍNH (8 TRƯỜNG HỢP KIỂM THỬ) - ASTRASHOP
+### BỘ KIỂM THỬ API CHÍNH (13 TRƯỜNG HỢP KIỂM THỬ) - ASTRASHOP
 ### -------------------------------------------------------------
-### Dùng với extension "REST Client" trên VS Code hoặc import vào Postman
+### Dùng với extension "REST Client" trên VS Code, HTTP Client trên IntelliJ hoặc import vào Postman
 ### Thay đổi biến @host nếu server chạy ở cổng khác.
 
 @host = http://localhost:8080
 @token = {{login.response.body.data.token}}
+@adminToken = {{adminLogin.response.body.data.token}}
 
 ### =============================================================
-### I. 4 TRƯỜNG HỢP KIỂM THỬ THÀNH CÔNG (SUCCESS CASES)
+### I. 8 TRƯỜNG HỢP KIỂM THỬ THÀNH CÔNG (SUCCESS CASES)
 ### =============================================================
 
 ### 1. [Thành công] Đăng ký khách hàng mới
@@ -55,12 +56,85 @@ Content-Type: application/json
 
 ###
 
+### 5. [Thành công] Áp dụng mã giảm giá (Voucher) vào giỏ hàng
+POST {{host}}/api/coupons/apply
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "code": "WELCOME10"
+}
+
+###
+
+### 6. [Thành công] Đặt hàng (Thanh toán - Checkout)
+POST {{host}}/api/orders
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "couponCode": "",
+  "shippingName": "Người nhận HTTP",
+  "shippingAddress": "789 Đường Láng, Hà Nội",
+  "shippingPhone": "0987654321",
+  "note": "Giao hàng tối"
+}
+
+###
+
+### 7. [Thành công] Admin đăng nhập để lấy Token Admin
+# @name adminLogin
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "usernameOrEmail": "admin",
+  "password": "admin123"
+}
+
+###
+
+### 8. [Thành công] Admin thêm sản phẩm mới
+POST {{host}}/api/admin/products
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Sản Phẩm HTTP Admin Test",
+  "description": "Tạo qua HTTP Client",
+  "price": 199000,
+  "stock": 40,
+  "imageUrl": "http_product.png",
+  "categoryId": 1,
+  "featured": true,
+  "discountPercent": 5,
+  "brand": "HttpBrand",
+  "images": []
+}
+
+###
+
 
 ### =============================================================
-### II. 4 TRƯỜNG HỢP KIỂM THỬ THẤT BẠI (FAILURE/EXCEPTION CASES)
+### II. 5 TRƯỜNG HỢP KIỂM THỬ THẤT BẠI (FAILURE/EXCEPTION CASES)
 ### =============================================================
 
-### 5. [Thất bại] Đăng nhập sai mật khẩu (Mã lỗi mong đợi: 401 hoặc 400)
+### 9. [Thất bại] Đăng ký trùng tên đăng nhập đã tồn tại (Mã lỗi mong đợi: 400 Bad Request)
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "email": "admin@shop.local",
+  "password": "Password123",
+  "fullName": "Admin Trùng",
+  "phone": "0987654321",
+  "address": "Hanoi"
+}
+
+###
+
+### 10. [Thất bại] Đăng nhập sai mật khẩu (Mã lỗi mong đợi: 400 Bad Request)
 POST {{host}}/api/auth/login
 Content-Type: application/json
 
@@ -71,7 +145,7 @@ Content-Type: application/json
 
 ###
 
-### 6. [Thất bại] Thêm vào giỏ hàng khi chưa đăng nhập (Thiếu Token - Mã lỗi mong đợi: 403 hoặc 401)
+### 11. [Thất bại] Thêm vào giỏ hàng khi chưa đăng nhập (Thiếu Token - Mã lỗi mong đợi: 403 Forbidden)
 POST {{host}}/api/cart/add
 Content-Type: application/json
 
@@ -82,19 +156,19 @@ Content-Type: application/json
 
 ###
 
-### 7. [Thất bại] Tài khoản USER thường truy cập trang Admin Dashboard (Phân quyền - Mã lỗi mong đợi: 403 Forbidden)
+### 12. [Thất bại] Tài khoản USER thường truy cập trang Admin Dashboard (Phân quyền - Mã lỗi mong đợi: 403 Forbidden)
 GET {{host}}/api/admin/dashboard
 Authorization: Bearer {{token}}
 
 ###
 
-### 8. [Thất bại] Đánh giá sản phẩm chưa mua hoặc chưa giao thành công (Logic nghiệp vụ - Mã lỗi mong đợi: 400 Bad Request)
+### 13. [Thất bại] Đánh giá sản phẩm chưa mua hoặc chưa giao thành công (Logic nghiệp vụ - Mã lỗi mong đợi: 400 Bad Request)
 POST {{host}}/api/reviews
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "productId": 2,
+  "productId": 3,
   "rating": 5,
   "comment": "Sản phẩm rất tốt nhưng tôi chưa mua!"
 }

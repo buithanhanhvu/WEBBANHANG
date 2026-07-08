@@ -34,3 +34,9 @@ build/
 
 ### Uploads ###
 /src/main/resources/static/uploads/*
+
+### Logs ###
+logs/
+*.log
+*.gz
+

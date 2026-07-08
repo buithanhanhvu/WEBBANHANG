@@ -220,9 +220,6 @@ public class AdminController {
         currentUserService.requireAdmin(request);
         return ApiResponse.ok(shopService.getAdminRevenueReport(period));
     }
-
-
-
     // ── Recycle Bin ──
 
     @GetMapping("/recycle-bin")

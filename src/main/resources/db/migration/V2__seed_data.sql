@@ -1,11 +1,3 @@
--- Chèn Ranks
-INSERT INTO ranks(id, name, subtitle, icon, description, min_spent, color, css_class) VALUES
-('shopper', 'Shopper', 'Người qua đường', '🛍️', 'Mới chân ướt chân ráo — mọi hành trình đều bắt đầu từ đây.', 0, '#334155', 'rank-shopper'),
-('shark', 'Shark', 'Cá mập tập sự', '🦈', 'Đã bắt đầu chi tiêu mạnh tay — bản năng thị trường đang thức tỉnh.', 500000, '#93c5fd', 'rank-shark'),
-('angel', 'Angel Investor', 'Nhà đầu tư thiên thần', '👼', 'Chi tiêu hào phóng, tầm nhìn xa. Những deal tốt không bao giờ bỏ qua.', 2000000, '#c4b5fd', 'rank-angel'),
-('unicorn', 'Unicorn', 'Kỳ lân công nghệ', '🦄', 'Hiếm có khó tìm. Danh hiệu lấp lánh dành cho những tâm hồn mua sắm đặc biệt.', 5000000, '#f0abfc', 'rank-unicorn'),
-('tycoon', 'Tycoon', 'Trùm tài phiệt', '💰', 'Vàng chảy theo bước chân. Chỉ những tay chi tiêu đẳng cấp mới chạm tới đây.', 15000000, '#fbbf24', 'rank-tycoon');
-
 -- Chèn Categories
 INSERT INTO categories(id, name, description) VALUES
 (1, 'Điện thoại', 'Smartphone và phụ kiện di động'),

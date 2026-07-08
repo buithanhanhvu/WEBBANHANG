@@ -144,70 +144,41 @@ erDiagram
         Long user_id FK
         Long product_id FK
     }
-    PRICE_HISTORY {
-        Long id PK
-        Long product_id FK
-        Decimal old_price
-        Decimal new_price
-        Int old_discount
-        Int new_discount
-        Timestamp changed_at
-    }
-    RECYCLE_BIN {
-        Long id PK
-        String entity_type
-        Long entity_id
-        String display_name
-        String original_data
-        Timestamp deleted_at
-    }
-    PASSWORD_RESETS {
-        String email PK
-        String otp_code
-        Timestamp expiry_time
-    }
-    REFRESH_TOKENS {
-        Long id PK
-        Long user_id FK
-        String token UK
-        Timestamp expiry_date
-    }
 
     USERS ||--o{ ORDERS : "places"
     USERS ||--o{ CART_ITEMS : "has"
     USERS ||--o{ REVIEWS : "writes"
     USERS ||--o{ USER_COUPONS : "collects"
     USERS ||--o{ WISHLISTS : "saves"
-    USERS ||--o{ REFRESH_TOKENS : "owns"
     CATEGORIES ||--o{ PRODUCTS : "contains"
     PRODUCTS ||--o{ PRODUCT_IMAGES : "has"
     PRODUCTS ||--o{ CART_ITEMS : "added_to"
     PRODUCTS ||--o{ ORDER_ITEMS : "ordered_in"
     PRODUCTS ||--o{ REVIEWS : "evaluated_in"
     PRODUCTS ||--o{ WISHLISTS : "liked"
-    PRODUCTS ||--o{ PRICE_HISTORY : "tracks"
     ORDERS ||--o{ ORDER_ITEMS : "contains"
     COUPONS ||--o{ ORDERS : "applied_to"
     COUPONS ||--o{ USER_COUPONS : "collected_in"
 ```
 
-### Danh sách 16 bảng trong Cơ sở dữ liệu:
-1.  **`users`**: Quản lý tài khoản người dùng (Khách hàng và Admin).
-2.  **`categories`**: Quản lý các danh mục sản phẩm.
-3.  **`products`**: Quản lý thông tin chi tiết và số lượng tồn kho của sản phẩm.
-4.  **`product_images`**: Lưu các hình ảnh phụ bổ sung cho sản phẩm (quan hệ 1-N với `products`).
-5.  **`cart_items`**: Quản lý các sản phẩm trong giỏ hàng tạm thời của khách hàng.
-6.  **`orders`**: Quản lý thông tin chung của đơn hàng (tổng tiền, giảm giá, địa chỉ giao hàng, trạng thái).
-7.  **`order_items`**: Lưu chi tiết các mặt hàng, số lượng và giá cụ thể tại thời điểm mua trong đơn hàng.
-8.  **`reviews`**: Lưu đánh giá số sao (1-5) và bình luận từ khách hàng đã mua sản phẩm.
-9.  **`coupons`**: Quản lý các mã giảm giá toàn hệ thống.
-10. **`user_coupons`**: Ví lưu trữ các mã giảm giá cá nhân mà khách hàng đã thu thập/sưu tầm được.
-11. **`wishlists`**: Lưu trữ danh sách các sản phẩm yêu thích của khách hàng.
-12. **`price_history`**: Ghi lại lịch sử các lần thay đổi giá của sản phẩm để phục vụ tính năng gửi thông báo khi có sản phẩm yêu thích được giảm giá.
-13. **`recycle_bin`**: Thùng rác hệ thống dùng lưu trữ các thực thể bị xóa mềm dưới dạng JSON nhằm hỗ trợ chức năng khôi phục.
-14. **`password_resets`**: Quản lý mã OTP và thời gian hết hạn phục vụ quy trình lấy lại mật khẩu.
-15. **`refresh_tokens`**: Lưu trữ Refresh Token phục vụ cơ chế tự động làm mới JWT Access Token.
-16. **`flyway_schema_history`**: Bảng hệ thống được tạo tự động bởi Flyway để giám sát phiên bản cấu trúc database.
+### Chú thích ý nghĩa của từng bảng trong Cơ sở dữ liệu:
+
+1. **`users` (Người dùng):** Lưu trữ thông tin tài khoản của khách hàng và quản trị viên, bao gồm tên đăng nhập (duy nhất), email (duy nhất), mật khẩu mã hóa BCrypt, vai trò (`ADMIN`/`CUSTOMER`), trạng thái (`ACTIVE`/`BANNED`), và các thông tin liên hệ khác.
+2. **`categories` (Danh mục sản phẩm):** Lưu thông tin phân loại sản phẩm (ví dụ: Điện thoại, Laptop, Gia dụng...) giúp cấu trúc danh mục và bộ lọc hoạt động dễ dàng.
+3. **`products` (Sản phẩm):** Lưu thông tin chi tiết về sản phẩm được bán, bao gồm tên, giá, số lượng tồn kho hiện tại, thương hiệu, mức chiết khấu và liên kết khóa ngoại với bảng danh mục.
+4. **`product_images` (Bộ sưu tập ảnh sản phẩm):** Lưu trữ danh sách ảnh bổ sung (gallery) của sản phẩm, giúp trang chi tiết sản phẩm hiển thị nhiều góc chụp khác nhau.
+5. **`cart_items` (Giỏ hàng):** Lưu trữ tạm thời các sản phẩm và số lượng tương ứng mà người dùng đã thêm vào giỏ hàng cá nhân trước khi thanh toán.
+6. **`wishlists` (Danh sách yêu thích):** Lưu thông tin các sản phẩm được người dùng yêu thích để nhận thông báo tự động khi có biến động giá hoặc giảm giá sản phẩm.
+7. **`price_history` (Lịch sử biến động giá):** Tự động ghi lại lịch sử các đợt thay đổi giá gốc/giá khuyến mãi của sản phẩm để theo dõi và tính toán hiển thị thông báo giảm giá cho khách hàng.
+8. **`coupons` (Mã giảm giá):** Lưu trữ các mã voucher do Admin phát hành, bao gồm mã giảm giá (`code` duy nhất), phần trăm giảm giá, giới hạn số lượt sử dụng tối đa (`max_uses`), và thời gian hiệu lực.
+9. **`user_coupons` (Ví Voucher cá nhân):** Liên kết trung gian lưu danh sách mã giảm giá mà khách hàng đã thu thập về ví của mình để áp dụng khi thanh toán.
+10. **`orders` (Đơn hàng):** Lưu thông tin hóa đơn tổng quát khi đặt hàng, bao gồm tổng giá trị, số tiền đã giảm, địa chỉ/SĐT giao hàng, trạng thái xử lý đơn hàng và mã giảm giá áp dụng (nếu có).
+11. **`order_items` (Chi tiết đơn hàng):** Lưu trữ danh sách sản phẩm, số lượng và giá của từng mặt hàng tại thời điểm mua trong một đơn hàng (bảo toàn thông tin hóa đơn khi sản phẩm thay đổi giá sau này).
+12. **`reviews` (Đánh giá & Bình luận):** Lưu các đánh giá bằng số sao (1-5 sao) và phản hồi của người dùng về sản phẩm, ràng buộc logic chỉ cho phép đánh giá sau khi đơn hàng được giao thành công.
+13. **`recycle_bin` (Thùng rác hệ thống):** Chứa các dữ liệu đã xóa mềm (Soft Delete) từ các bảng User, Product, Category, Coupon dưới dạng JSON giúp khôi phục nhanh mà không ảnh hưởng tới toàn vẹn dữ liệu.
+14. **`refresh_tokens` (Refresh Token):** Quản lý các token dùng để tự động gia hạn token JWT ngắn hạn, tăng tính bảo mật cho cơ chế đăng nhập.
+15. **`password_resets` (OTP Quên mật khẩu):** Lưu trữ email, mã xác thực OTP và thời gian hết hạn (1 phút) để phục vụ cho tính năng khôi phục mật khẩu an toàn.
+16. **`flyway_schema_history` (Lịch sử di chuyển schema):** Bảng do thư viện Flyway tự động khởi tạo và quản lý nhằm ghi nhận lịch sử thực thi các file SQL migration, đảm bảo cấu trúc cơ sở dữ liệu trên máy chủ MySQL luôn đồng bộ với source code của dự án.
 
 * **Các Migration Script:** Được tổ chức bằng Flyway tại `src/main/resources/db/migration/`:
   * [V1__init_schema.sql](file:///e:/WEBBANHANG/src/main/resources/db/migration/V1__init_schema.sql): Khởi tạo lược đồ các bảng, chỉ định rõ khóa ngoại (`FOREIGN KEY`) và ràng buộc duy nhất (`UNIQUE KEY`).
@@ -227,133 +198,40 @@ Backend sử dụng thư viện `springdoc-openapi-starter-webmvc-ui` (v2.8.5) t
 
 ---
 
-## 4. Bộ Kiểm Thử API & Kết Quả Thực Tế (15 Kịch Bản Toàn Diện)
+## 4. Bộ Test API Với 13 Trường Hợp Kiểm Thử Toàn Diện (Vượt mức 8 yêu cầu tối thiểu)
 
-Hệ thống đã xây dựng và hoàn thành đầy đủ **15 kịch bản kiểm thử toàn diện** bao phủ toàn bộ luồng nghiệp vụ từ đăng ký, đăng nhập, phân quyền, làm mới token, giỏ hàng, áp dụng coupon, đặt hàng, quản trị sản phẩm, kiểm tra tính hợp lệ của dữ liệu (Bean Validation), quản lý sản phẩm yêu thích (Wishlist) và nghiệp vụ gửi đánh giá phức tạp.
+Thầy cô yêu cầu tối thiểu **8 kịch bản kiểm thử** đại diện cho các luồng xử lý thành công (Success) và thất bại/ngoại lệ (Failure/Exception). Hệ thống đã đáp ứng vượt mong đợi với **13 kịch bản kiểm thử toàn diện** được triển khai theo 2 phương pháp:
 
-### 4.1. Ma Trận Kịch Bản Kiểm Thử (Test Case Matrix)
+### Phương án A: Tự động hóa bằng JUnit và MockMvc
 
-Dưới đây là bảng ma trận kiểm thử chi tiết thể hiện đầy đủ các trường hợp kiểm thử đã được chạy:
+Dự án đã có sẵn mã nguồn kiểm thử tự động tích hợp tại [ApiControllerTests.java](src/test/java/com/example/webbanhang/controller/ApiControllerTests.java). Bạn có thể chạy trực tiếp bằng IDE (nhấn Run class) hoặc chạy qua dòng lệnh terminal:
 
-| STT | Mã Kịch Bản | Tên Kịch Bản Kiểm Thử | HTTP Method | Endpoint API | Dữ Liệu Đầu Vào | Kết Quả Mong Đợi (HTTP Status) | Trạng Thái |
-|:---:|:-----------|:----------------------|:-----------:|:-------------|:----------------|:------------------------------:|:----------:|
-| 1 | TC-01 | Đăng ký tài khoản mới thành công | POST | `/api/auth/register` | JSON chứa username mới, email, password... | `200 OK` (Trả về token) | **Passed** |
-| 2 | TC-02 | Đăng ký thất bại do trùng Username/Email | POST | `/api/auth/register` | Trùng username `admin` hoặc email đã có | `400 Bad Request` | **Passed** |
-| 3 | TC-03 | Đăng nhập thành công lấy JWT Token | POST | `/api/auth/login` | Đúng tài khoản & mật khẩu hợp lệ | `200 OK` (Trả về JWT + Refresh Token) | **Passed** |
-| 4 | TC-04 | Đăng nhập thất bại do sai thông tin mật khẩu | POST | `/api/auth/login` | Sai mật khẩu khách hàng | `400 Bad Request` | **Passed** |
-| 5 | TC-05 | Làm mới Access Token bằng Refresh Token | POST | `/api/auth/refresh` | Gửi kèm chuỗi `refreshToken` hợp lệ | `200 OK` (Trả về Access Token mới) | **Passed** |
-| 6 | TC-06 | Lấy danh sách sản phẩm (Lọc & Phân trang) | GET | `/api/products` | Query params: `search`, `page`, `size` | `200 OK` (Trả về mảng JSON) | **Passed** |
-| 7 | TC-07 | Thêm sản phẩm vào giỏ hàng | POST | `/api/cart/add` | Header `Authorization`, productId, quantity | `200 OK` (Trả về giỏ hàng mới) | **Passed** |
-| 8 | TC-08 | Áp dụng mã giảm giá (Coupon) thành công | POST | `/api/coupons/apply` | Header `Authorization`, mã coupon `WELCOME10` | `200 OK` (Tính lại tổng tiền & discount) | **Passed** |
-| 9 | TC-09 | Thanh toán & Đặt hàng thành công | POST | `/api/orders` | Header `Authorization`, thông tin người nhận | `200 OK` (Tạo đơn hàng, cập nhật kho) | **Passed** |
-| 10 | TC-10 | Chặn truy cập Admin Dashboard (Role CUSTOMER) | GET | `/api/admin/dashboard` | Header `Authorization` của CUSTOMER | `403 Forbidden` | **Passed** |
-| 11 | TC-11 | Admin tạo mới sản phẩm thành công | POST | `/api/admin/products` | Header `Authorization` ADMIN, thông tin product | `200 OK` (Trả về thông tin product mới) | **Passed** |
-| 12 | TC-12 | Admin tạo sản phẩm thất bại do lỗi Validation | POST | `/api/admin/products` | Tên rỗng, giá tiền âm, stock âm | `400 Bad Request` (Ràng buộc Bean) | **Passed** |
-| 13 | TC-13 | Thêm sản phẩm yêu thích (Wishlist) | POST | `/api/wishlist/{productId}` | Header `Authorization`, productId | `200 OK` (Lưu thành công) | **Passed** |
-| 14 | TC-14 | Luồng nghiệp vụ Đặt hàng -> Giao hàng -> Đánh giá | POST | `/api/reviews` | Flow: Chặn review khi chưa mua -> Giao hàng -> Đánh giá thành công | `400 Bad Request` & `200 OK` | **Passed** |
-| 15 | TC-15 | Xem và cập nhật hồ sơ cá nhân | PUT | `/api/auth/me` | Header `Authorization`, thông tin cá nhân mới | `200 OK` (Trả về profile mới) | **Passed** |
+```bash
+./mvnw test
+```
 
----
+Bộ test tự động hóa này bao gồm đúng 13 trường hợp chia làm 2 nhóm:
 
-### 4.2. Phương Án A: Kiểm Thử Tự Động Với JUnit & MockMvc
+#### I. Các ca kiểm thử thành công (8 Success Cases)
+1. **`registerSuccess`:** Đăng ký tài khoản khách hàng mới với dữ liệu hợp lệ.
+2. **`loginSuccess`:** Đăng nhập đúng thông tin tài khoản, nhận về Access Token (JWT) và Refresh Token.
+3. **`getProductDetail`:** Xem thông tin chi tiết một sản phẩm công khai (không yêu cầu token).
+4. **`getProductsFilteredAndPaged`:** Lọc sản phẩm theo từ khóa tìm kiếm và phân trang thành công.
+5. **`addToCart`:** Người dùng đã xác thực thêm sản phẩm vào giỏ hàng thành công.
+6. **`applyCoupon`:** Thu thập coupon vào ví người dùng và áp dụng thành công mã coupon hợp lệ vào giỏ hàng.
+7. **`checkoutSuccess`:** Thanh toán giỏ hàng, tạo đơn hàng thành công (Backend kích hoạt Row Locking trừ kho).
+8. **`adminAddProductSuccess`:** Tài khoản Admin thêm sản phẩm mới thành công (chức năng CRUD của Admin).
 
-Dự án đã tích hợp mã nguồn kiểm thử tích hợp tự động toàn diện tại [ApiControllerTests.java](file:///e:/WEBBANHANG/src/test/java/com/example/webbanhang/controller/ApiControllerTests.java).
+#### II. Các ca kiểm thử thất bại/lỗi (5 Failure Cases)
+9. **`registerFailDuplicate`:** Đăng ký trùng tên đăng nhập/email đã tồn tại (Trả về `400 Bad Request`).
+10. **`loginFailWrongPassword`:** Đăng nhập thất bại do nhập sai mật khẩu (Trả về `400 Bad Request`).
+11. **`addToCartUnauthenticated`:** Thêm vào giỏ hàng khi chưa đăng nhập (Không có token JWT - Trả về `403 Forbidden`).
+12. **`adminAccessForbidden`:** Tài khoản role thường `CUSTOMER` cố gắng truy cập API quản lý `/api/admin/dashboard` (Trả về `403 Forbidden`).
+13. **`reviewFailUnpurchased`:** Viết đánh giá sản phẩm thất bại do người dùng chưa từng mua sản phẩm đó hoặc đơn hàng chưa giao thành công (Ràng buộc logic nghiệp vụ chặt chẽ - Trả về `400 Bad Request`).
 
-* **Lệnh thực hiện chạy test:**
-  ```bash
-  ./mvnw test
-  ```
-* **Lệnh tạo báo cáo Surefire HTML:**
-  ```bash
-  ./mvnw surefire-report:report-only
-  ```
+### Phương án B: Kiểm thử thủ công bằng file REST Client
 
-#### Kết quả chạy thử nghiệm tự động:
-Toàn bộ 15 kịch bản test nghiệp vụ cùng với kiểm thử khởi tạo Spring Context đã vượt qua thành công **100% (16/16 passed)**. 
+Một file [api-test-cases.http](api-test-cases.http) đã được tạo sẵn ở thư mục gốc của dự án chứa đúng 13 trường hợp kiểm thử tương ứng.
 
-Báo cáo kiểm thử trực quan được kết xuất ra file HTML dạng Surefire Report:
-![Báo cáo kết quả chạy JUnit Test](images/junit_test_results.png)
-
----
-
-### 4.3. Phương Án B: Kiểm Thử Thủ Công & Tài Liệu Hóa OpenAPI Swagger
-
-#### 1. Tài liệu hóa API động qua Swagger UI
-Swagger UI tự động sinh tài liệu từ mã nguồn giúp dễ dàng tương tác và gọi thử các API trực tiếp:
-* **Đường dẫn truy cập:** `http://localhost:8080/swagger-ui/index.html` (khi đang chạy ứng dụng backend).
-![Tài liệu hóa API qua Swagger UI](images/swagger_ui_api.png)
-
-#### 2. Kịch bản chạy thử bằng REST Client (.http)
-Sử dụng file [api-test-cases.http](file:///e:/WEBBANHANG/api-test-cases.http) trong VS Code để gửi request trực tiếp đến server chạy local. Kết quả trả về của các API khớp chính xác với thiết kế mã lỗi nghiệp vụ:
-* **Cách sử dụng:** Cài đặt extension **REST Client** trên VS Code. Sau đó, mở file [api-test-cases.http](file:///e:/WEBBANHANG/api-test-cases.http) và nhấn vào nút **"Send Request"** ở trên mỗi API để kiểm tra phản hồi trực tiếp từ server.
-* **Danh sách kịch bản:** bao gồm đăng ký, đăng nhập, xem sản phẩm, thêm giỏ hàng, chặn phân quyền Admin và chặn viết đánh giá khi chưa mua hàng (kiểm tra logic nghiệp vụ).
-
----
-
-## 5. Hình Ảnh Minh Họa Các Chức Năng Hệ Thống (Màn Hình Giao Diện)
-
-Dưới đây là hình ảnh minh họa thực tế các chức năng chính của hệ thống thương mại điện tử AstraShop được ghi lại khi vận hành:
-
-### 5.1. Phân Hệ Khách Hàng (Customer Interface)
-
-#### **Hình 3.1: Giao diện đăng nhập**
-Giao diện đăng nhập tối giản, hiện đại tích hợp xác thực JWT Token và đăng nhập nhanh bằng tài khoản Google.
-![Hình 3.1: Giao diện đăng nhập](images/report/hinh3_1_login.png)
-
-#### **Hình 3.2: Trang chủ**
-Trang chủ AstraShop hiển thị banner nổi bật, các danh mục sản phẩm chính và danh sách sản phẩm nổi bật thu hút người dùng.
-![Hình 3.2: Trang chủ](images/report/hinh3_2_trang_chu.png)
-
-#### **Hình 3.3: Danh sách sản phẩm**
-Trang cửa hàng hiển thị danh sách sản phẩm với các bộ lọc thông minh (danh mục, khoảng giá, sắp xếp) và thanh tìm kiếm trực quan.
-![Hình 3.3: Danh sách sản phẩm](images/report/hinh3_3_danh_sach_san_pham.png)
-
-#### **Hình 3.4: Chi tiết sản phẩm**
-Trang thông tin chi tiết của một sản phẩm bao gồm bộ sưu tập hình ảnh, đánh giá trung bình, giá bán, mô tả chi tiết và phần bình luận đánh giá.
-![Hình 3.4: Chi tiết sản phẩm](images/report/hinh3_4_chi_tiet_san_pham.png)
-
-#### **Hình 3.5: Trang thu thập Voucher**
-Trang danh sách mã giảm giá khuyến mãi (`/vouchers`) nơi khách hàng có thể nhấn chọn thu thập các mã giảm giá vào ví cá nhân.
-![Hình 3.5: Trang thu thập Voucher](images/report/hinh3_5_collect_voucher.png)
-
-#### **Hình 3.6: Chọn/Sử dụng Voucher**
-Giao diện giỏ hàng hoặc lúc thanh toán khi người dùng click chọn voucher khả dụng trong ví của mình để áp dụng giảm giá 10% (`WELCOME10`) trực tiếp vào đơn hàng.
-![Hình 3.6: Chọn/Sử dụng Voucher](images/report/hinh3_6_use_voucher.png)
-
-#### **Hình 3.7: Trang điền thông tin thanh toán**
-Giao diện checkout (`/checkout`) hiển thị thông tin sản phẩm mua kèm theo form thông tin nhận hàng của khách hàng (Họ tên, SĐT, Địa chỉ, Ghi chú) trước khi bấm xác nhận đặt hàng.
-![Hình 3.7: Trang điền thông tin thanh toán](images/report/hinh3_7_thanh_toan.png)
-
-#### **Hình 3.8: Theo dõi đơn hàng (Lịch sử mua hàng)**
-Giao diện lịch sử đơn hàng (`/orders`) giúp khách hàng xem lại các đơn hàng đã đặt, thông tin chi tiết từng đơn hàng và trạng thái đơn hàng (ví dụ: `PENDING`).
-![Hình 3.8: Theo dõi đơn hàng](images/report/hinh3_8_theo_doi_don_hang.png)
-
-#### **Hình 3.9: Trang sản phẩm yêu thích (Wishlist)**
-Trang danh sách sản phẩm yêu thích (`/wishlist`) của khách hàng, tích hợp tính năng tự động hiển thị thông báo giảm giá nếu sản phẩm có sự thay đổi giá trong 7 ngày gần nhất.
-![Hình 3.9: Trang sản phẩm yêu thích (Wishlist)](images/report/hinh3_9_wishlist.png)
-
----
-
-### 5.2. Phân Hệ Quản Trị Viên (Admin Interface)
-
-#### **Hình 3.10: Dashboard Admin**
-Bảng điều khiển trung tâm dành cho Admin hiển thị thống kê tổng quan doanh thu, số lượng đơn hàng, biểu đồ tăng trưởng và danh sách sản phẩm bán chạy.
-![Hình 3.10: Dashboard Admin](images/report/hinh3_10_dashboard_admin.png)
-
-#### **Hình 3.11: Quản lý sản phẩm**
-Màn hình CRUD sản phẩm cho phép Admin thêm, sửa, xóa mềm sản phẩm, cập nhật tồn kho và hình ảnh sản phẩm.
-![Hình 3.11: Quản lý sản phẩm](images/report/hinh3_11_quan_ly_san_pham.png)
-
-#### **Hình 3.12: Quản lý đơn hàng**
-Giao diện quản lý danh sách đơn hàng toàn hệ thống giúp Admin theo dõi và cập nhật trạng thái đơn hàng (Duyệt đơn, Đang giao, Đã giao, Hủy đơn).
-![Hình 3.12: Quản lý đơn hàng](images/report/hinh3_12_quan_ly_don_hang.png)
-
-#### **Hình 3.13: Quản lý Voucher**
-Trang thiết lập mã giảm giá giúp Admin tạo mới các mã giảm giá có giới hạn số lần sử dụng và thời hạn hiệu lực cụ thể.
-![Hình 3.13: Quản lý Voucher](images/report/hinh3_13_quan_ly_voucher.png)
-
-#### **Hình 3.14: Recycle Bin (Thùng rác)**
-Thùng rác hệ thống lưu trữ các đối tượng bị xóa mềm (Sản phẩm, Danh mục, Người dùng, Voucher) dưới dạng JSON, cho phép Admin khôi phục nguyên trạng hoặc xóa vĩnh viễn.
-![Hình 3.14: Recycle Bin](images/report/hinh3_14_recycle_bin.png)
-
-
+* **Cách sử dụng:** Cài đặt extension **REST Client** trên VS Code hoặc dùng tính năng HTTP Client của IntelliJ. Mở file [api-test-cases.http](api-test-cases.http) và nhấn vào nút **"Send Request"** nằm phía trên mỗi API để kiểm tra kết quả trả về trực tiếp từ server.
+* **Danh sách test case thủ công:** Được chia làm 2 phần rõ rệt (8 ca thành công, 5 ca thất bại nghiệp vụ/phân quyền) giúp người dùng thực hiện demo nhanh chóng.

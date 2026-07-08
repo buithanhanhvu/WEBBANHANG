@@ -45,8 +45,6 @@ public class DatabaseSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-
-
         // 2. Seed Categories
         if (categoryRepository.count() == 0) {
             categoryRepository.saveAll(List.of(

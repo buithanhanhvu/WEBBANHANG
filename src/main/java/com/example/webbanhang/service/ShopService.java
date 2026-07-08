@@ -677,8 +677,6 @@ public class ShopService {
         userRepository.save(u);
     }
 
-
-
     public Map<String, Object> dashboard(String period) {
         Map<String, Object> result = new LinkedHashMap<>();
         LocalDateTime start = resolvePeriodStart(period);
@@ -1189,6 +1187,5 @@ public class ShopService {
 
         return result;
     }
-
 
 }

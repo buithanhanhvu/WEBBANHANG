@@ -102,9 +102,6 @@ export interface Review {
   comment?: string;
   created_at: string;
 }
-
-
-
 export interface PriceHistory {
   id: number;
   product_id: number;

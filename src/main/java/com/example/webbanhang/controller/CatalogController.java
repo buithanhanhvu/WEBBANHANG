@@ -80,6 +80,4 @@ public class CatalogController {
     public ApiResponse<List<Map<String, Object>>> priceHistory(@PathVariable long id) {
         return ApiResponse.ok(catalogService.priceHistory(id));
     }
-
-
 }
