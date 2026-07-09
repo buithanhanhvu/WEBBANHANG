@@ -154,9 +154,7 @@ export const Profile: React.FC = () => {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const res = await api.post('/api/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const res = await api.post('/api/upload', formData);
       const newUrl = res.data.data.url;
       setAvatarUrl(newUrl);
       

@@ -3,9 +3,6 @@ import { useAuthStore } from '../store/useAuthStore';
 
 const api = axios.create({
   baseURL: '',
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 api.interceptors.request.use(

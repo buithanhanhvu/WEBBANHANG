@@ -235,8 +235,9 @@ Dưới đây là hình ảnh thực tế ghi lại từ hệ thống khi vận 
 #### 1. Màn hình Đăng nhập & Đăng ký:
 ![Màn hình Đăng nhập](./images/login_page.png?raw=true)
 
-#### 2. Hồ sơ cá nhân:
+#### 2. Hồ sơ cá nhân & Đổi mật khẩu:
 ![Trang hồ sơ cá nhân](./images/profile_page.png?raw=true)
+![Đổi mật khẩu](./images/change_password.png?raw=true)
 
 #### 3. Admin Dashboard & Thống kê doanh thu:
 ![Admin Dashboard](./images/admin_dashboard.png?raw=true)

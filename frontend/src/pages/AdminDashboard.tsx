@@ -154,11 +154,7 @@ export const AdminDashboard: React.FC = () => {
     
     setUploadingImage(true);
     try {
-      const res = await api.post('/api/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      const res = await api.post('/api/upload', formData);
       if (res.data && res.data.data && res.data.data.url) {
         setProdImage(res.data.data.url);
         alert('Tải ảnh lên thành công!');
@@ -183,11 +179,7 @@ export const AdminDashboard: React.FC = () => {
     
     setGalleryUploadLoading(true);
     try {
-      const res = await api.post('/api/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      const res = await api.post('/api/upload', formData);
       if (res.data && res.data.data && res.data.data.url) {
         setProdGallery(prev => [...prev, res.data.data.url]);
         alert('Tải ảnh chi tiết lên thành công!');
