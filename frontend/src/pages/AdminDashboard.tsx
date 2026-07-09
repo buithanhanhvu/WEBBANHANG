@@ -196,8 +196,20 @@ export const AdminDashboard: React.FC = () => {
 
   const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!prodName.trim() || !prodCatId || prodPrice <= 0) {
+    if (!prodName.trim() || !prodCatId) {
       alert('Vui lòng điền đầy đủ các thông tin bắt buộc!');
+      return;
+    }
+    if (prodPrice <= 0) {
+      alert('Giá sản phẩm phải lớn hơn 0!');
+      return;
+    }
+    if (prodStock < 0) {
+      alert('Số lượng tồn kho không được âm!');
+      return;
+    }
+    if (prodDiscount < 0 || prodDiscount > 100) {
+      alert('Phần trăm giảm giá phải nằm trong khoảng từ 0 đến 100!');
       return;
     }
 
@@ -274,7 +286,18 @@ export const AdminDashboard: React.FC = () => {
 
   const handleCouponSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!coupCode.trim() || coupDiscount < 0 || coupDiscount > 100) return;
+    if (!coupCode.trim()) {
+      alert('Vui lòng nhập mã code giảm giá!');
+      return;
+    }
+    if (coupDiscount < 1 || coupDiscount > 100) {
+      alert('Phần trăm chiết khấu phải nằm trong khoảng từ 1 đến 100!');
+      return;
+    }
+    if (coupMaxUses <= 0) {
+      alert('Lượt sử dụng tối đa phải lớn hơn 0!');
+      return;
+    }
 
     const payload = {
       code: coupCode.trim().toUpperCase(),
@@ -1176,11 +1199,11 @@ export const AdminDashboard: React.FC = () => {
                 </div>
                 <div className="space-y-1">
                   <label htmlFor="prodPrice" className="text-[10px] font-bold text-slate-500 tracking-wide uppercase">Giá sản phẩm *</label>
-                  <input id="prodPrice" required type="number" value={prodPrice === 0 ? '' : prodPrice} onChange={(e) => setProdPrice(Number(e.target.value))} placeholder="Nhập giá bán" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold" />
+                  <input id="prodPrice" required type="number" min="1" value={prodPrice === 0 ? '' : prodPrice} onChange={(e) => setProdPrice(Number(e.target.value))} placeholder="Nhập giá bán" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold" />
                 </div>
                 <div className="space-y-1">
                   <label htmlFor="prodStock" className="text-[10px] font-bold text-slate-500 tracking-wide uppercase">Tồn kho *</label>
-                  <input id="prodStock" required type="number" value={prodStock === 0 ? '' : prodStock} onChange={(e) => setProdStock(Number(e.target.value))} placeholder="Nhập số lượng tồn kho" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold" />
+                  <input id="prodStock" required type="number" min="0" value={prodStock === 0 ? '' : prodStock} onChange={(e) => setProdStock(Number(e.target.value))} placeholder="Nhập số lượng tồn kho" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold" />
                 </div>
                 <div className="space-y-1">
                   <label htmlFor="prodCatId" className="text-[10px] font-bold text-slate-500 tracking-wide uppercase">Danh mục *</label>
@@ -1418,7 +1441,7 @@ export const AdminDashboard: React.FC = () => {
               </div>
               <div className="space-y-1">
                 <label htmlFor="coupMaxUses" className="text-[10px] font-bold text-slate-500 tracking-wide uppercase">Lượt sử dụng tối đa</label>
-                <input id="coupMaxUses" required type="number" value={coupMaxUses} onChange={(e) => setCoupMaxUses(Number(e.target.value))} placeholder="Nhập lượt sử dụng tối đa" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold" />
+                <input id="coupMaxUses" required type="number" min="1" value={coupMaxUses} onChange={(e) => setCoupMaxUses(Number(e.target.value))} placeholder="Nhập lượt sử dụng tối đa" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">

@@ -210,6 +210,7 @@ export const Register: React.FC = () => {
               </span>
               <input
                 type="text"
+                maxLength={11}
                 {...register('phone', { 
                   required: 'Số điện thoại không được để trống',
                   pattern: {

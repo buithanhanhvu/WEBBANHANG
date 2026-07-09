@@ -164,6 +164,7 @@ export const Checkout: React.FC = () => {
                   id="shippingPhone"
                   type="tel"
                   placeholder="Ví dụ: 0912345678"
+                  maxLength={11}
                   {...register('shippingPhone', { 
                     required: 'Số điện thoại không được để trống',
                     pattern: {

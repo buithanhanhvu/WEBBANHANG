@@ -1,0 +1,24 @@
+{
+  "name": "webbanhang",
+  "version": "1.0.0",
+  "description": "Dự án **Mini E-Commerce System** là một hệ thống bán hàng trực tuyến toàn diện, được xây dựng với kiến trúc **Monolithic** tinh gọn, hiện đại và chuẩn hóa.",
+  "main": "capture.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/buithanhanhvu/WEBBANHANG.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/buithanhanhvu/WEBBANHANG/issues"
+  },
+  "homepage": "https://github.com/buithanhanhvu/WEBBANHANG#readme",
+  "dependencies": {
+    "playwright": "^1.61.1"
+  }
+}

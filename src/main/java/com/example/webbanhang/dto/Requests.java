@@ -22,6 +22,7 @@ public final class Requests {
         String password,
 
         String fullName,
+        @Pattern(regexp = "^$|^[0-9]{9,11}$", message = "Số điện thoại không hợp lệ (phải gồm 9-11 chữ số)")
         String phone,
         String address
     ) {}
@@ -66,6 +67,7 @@ public final class Requests {
         @NotBlank(message = "Full name is required")
         String fullName,
 
+        @Pattern(regexp = "^$|^[0-9]{9,11}$", message = "Số điện thoại không hợp lệ (phải gồm 9-11 chữ số)")
         String phone,
         String address,
         String avatarUrl
@@ -138,6 +140,8 @@ public final class Requests {
         Boolean active,
         LocalDate startDate,
         LocalDate endDate,
+        @NotNull(message = "Lượt sử dụng tối đa không được để trống")
+        @Min(value = 1, message = "Lượt sử dụng tối đa phải lớn hơn 0")
         Integer maxUses
     ) {}
 
@@ -151,6 +155,7 @@ public final class Requests {
         String shippingAddress,
 
         @NotBlank(message = "Shipping phone is required")
+        @Pattern(regexp = "^[0-9]{9,11}$", message = "Số điện thoại không hợp lệ (phải gồm 9-11 chữ số)")
         String shippingPhone,
 
         String note

@@ -40,3 +40,8 @@ logs/
 *.log
 *.gz
 
+# Node / Playwright
+node_modules/
+images/report_backup/
+
+

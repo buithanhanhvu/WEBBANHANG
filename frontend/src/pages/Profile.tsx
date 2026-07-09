@@ -372,6 +372,7 @@ export const Profile: React.FC = () => {
                     <input
                       id="phone"
                       type="tel"
+                      maxLength={11}
                       {...infoForm.register('phone', {
                         required: 'Số điện thoại không được để trống',
                         pattern: {
