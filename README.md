@@ -228,15 +228,9 @@ Sau khi khởi chạy, Flyway sẽ tự động chạy các tệp migrations và
 
 ---
 
-## 📸 Review & Demo các Chức năng Hệ thống
+## 📸 Hình ảnh các trang chức năng (Review & Demo)
 
-Dưới đây là một số hình ảnh và video thực tế ghi lại từ hệ thống khi vận hành:
-
-### 📽️ Video Demo quy trình mua hàng & quản trị:
-- **Khách hàng mua hàng & Thanh toán**: [customer_flow_demo.webp](./images/customer_flow_demo.webp?raw=true)
-- **Quản trị viên quản lý Dashboard**: [admin_flow_demo.webp](./images/admin_flow_demo.webp?raw=true)
-
-### 🖼️ Hình ảnh các trang chức năng:
+Dưới đây là hình ảnh thực tế ghi lại từ hệ thống khi vận hành:
 
 #### 1. Màn hình Đăng nhập & Đăng ký:
 ![Màn hình Đăng nhập](./images/login_page.png?raw=true)
