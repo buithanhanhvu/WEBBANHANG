@@ -12,6 +12,8 @@ import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Vouchers } from './pages/Vouchers';
 import { Wishlist } from './pages/Wishlist';
+import { VNPayReturn } from './pages/VNPayReturn';
+import { PaymentResult } from './pages/PaymentResult';
 import { CartDrawer } from './components/CartDrawer';
 import { useAuthStore } from './store/useAuthStore';
 import { useCartStore } from './store/useCartStore';
@@ -168,6 +170,8 @@ const AppContent: React.FC = () => {
           <Route path="/product/:id" element={<ProductDetail />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/checkout" element={<Checkout />} />
+          <Route path="/checkout/vnpay-return" element={<VNPayReturn />} />
+          <Route path="/payment/result" element={<PaymentResult />} />
           <Route path="/orders" element={<MyOrders />} />
           <Route path="/vouchers" element={<Vouchers />} />
           <Route path="/wishlist" element={<Wishlist />} />

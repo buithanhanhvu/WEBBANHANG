@@ -70,8 +70,9 @@ Tất cả các màn hình yêu cầu đều được thiết kế giao diện c
 * **`ProductList.tsx` (Danh sách sản phẩm):** Hỗ trợ tìm kiếm, lọc qua `FilterSidebar`, sắp xếp sản phẩm theo giá hoặc ngày tạo, tích hợp phân trang.
 * **`ProductDetail.tsx` (Chi tiết sản phẩm):** Hiển thị bộ ảnh gallery, giá gốc và giá sau chiết khấu, số lượng tồn kho thực tế, mô tả chi tiết sản phẩm và danh sách đánh giá/bình luận của người dùng.
 * **`Cart.tsx` (Trang giỏ hàng):** Hiển thị danh sách chi tiết các món hàng, hỗ trợ nhập voucher và hiển thị ví voucher của người dùng để chọn nhanh.
-* **`Checkout.tsx` (Thanh toán):** Form nhập thông tin nhận hàng (Tên, SĐT, Địa chỉ, ghi chú). Tích hợp chọn nhanh voucher khả dụng và hiển thị thông tin hóa đơn tổng hợp.
-* **`MyOrders.tsx` (Đơn hàng của tôi):** Danh sách lịch sử đơn hàng của người dùng. Click vào từng đơn hàng sẽ hiển thị chi tiết các món đã mua, số tiền và thanh trạng thái stepper. Hỗ trợ nút Hủy đơn nhanh.
+* **`Checkout.tsx` (Thanh toán):** Form nhập thông tin nhận hàng (Tên, SĐT, Địa chỉ, ghi chú). Tích hợp chọn nhanh voucher khả dụng, hiển thị thông tin hóa đơn tổng hợp, hỗ trợ chọn phương thức thanh toán **COD** hoặc **VNPAY** trực quan, và tự động điều hướng sang cổng thanh toán VNPAY Sandbox.
+* **`PaymentResult.tsx` (Kết quả thanh toán - Mới):** Trang đích nhận redirect từ cổng thanh toán VNPAY, hiển thị trạng thái giao dịch (Thành công/Thất bại) kèm countdown 5s tự động chuyển hướng về trang Đơn hàng hoặc Giỏ hàng tương ứng.
+* **`MyOrders.tsx` (Đơn hàng của tôi):** Danh sách lịch sử đơn hàng của người dùng. Click vào từng đơn hàng sẽ hiển thị chi tiết các món đã mua, số tiền, thanh trạng thái stepper, kèm theo thông tin **Phương thức thanh toán** và **Trạng thái thanh toán (PAID/PENDING/FAILED)** rõ ràng. Hỗ trợ nút Hủy đơn nhanh.
 * **`Profile.tsx` (Hồ sơ cá nhân):** Quản lý thông tin cá nhân, cập nhật địa chỉ và đổi mật khẩu.
 * **`Vouchers.tsx` (Ví Voucher):** Nơi người dùng khám phá và nhấn thu thập (collect) các mã giảm giá đang hoạt động trên hệ thống.
 * **`Wishlist.tsx` (Sản phẩm yêu thích):** Lưu trữ danh sách sản phẩm yêu thích và hiển thị thông báo tự động nếu sản phẩm trong danh sách này được giảm giá.

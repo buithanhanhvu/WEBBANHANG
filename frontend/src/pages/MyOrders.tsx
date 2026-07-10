@@ -124,6 +124,22 @@ export const MyOrders: React.FC = () => {
                           {new Date(order.created_at).toLocaleDateString('vi-VN')}
                         </span>
                       </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                          selectedOrderId === order.id 
+                            ? 'bg-slate-800 text-slate-300 border border-slate-700' 
+                            : 'bg-slate-100 text-slate-600 border border-slate-250'
+                        }`}>
+                          {order.payment_method || 'COD'}
+                        </span>
+                        <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded ${
+                          order.payment_status === 'PAID' ? 'bg-emerald-100 text-emerald-800' :
+                          order.payment_status === 'FAILED' ? 'bg-rose-100 text-rose-800' :
+                          'bg-amber-100 text-amber-800'
+                        }`}>
+                          {order.payment_status || 'PENDING'}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Status Badge */}
@@ -189,9 +205,9 @@ export const MyOrders: React.FC = () => {
                   <OrderStatusStepper status={selectedOrder.status} />
                 </div>
 
-                {/* Shipping Details */}
+                {/* Shipping & Payment Details */}
                 <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100 space-y-3.5 text-xs font-semibold text-slate-600">
-                  <h4 className="font-extrabold text-slate-850 tracking-wide uppercase">Thông tin người nhận</h4>
+                  <h4 className="font-extrabold text-slate-850 tracking-wide uppercase">Thông tin vận chuyển & thanh toán</h4>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-semibold">
                     <div>
@@ -205,6 +221,22 @@ export const MyOrders: React.FC = () => {
                     <div className="sm:col-span-2">
                       <span className="text-slate-405 block mb-0.5">Địa chỉ giao hàng:</span>
                       <span className="text-slate-800 font-extrabold">{selectedOrder.shipping_address}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-405 block mb-0.5">Phương thức thanh toán:</span>
+                      <span className="text-slate-800 font-extrabold uppercase">
+                        {selectedOrder.payment_method === 'VNPAY' ? '💳 VNPAY Online' : '💵 Khi nhận hàng (COD)'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-405 block mb-0.5">Trạng thái thanh toán:</span>
+                      <span className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-extrabold uppercase ${
+                        selectedOrder.payment_status === 'PAID' ? 'bg-emerald-100 text-emerald-800' :
+                        selectedOrder.payment_status === 'FAILED' ? 'bg-rose-100 text-rose-800' :
+                        'bg-amber-100 text-amber-800'
+                      }`}>
+                        {selectedOrder.payment_status || 'PENDING'}
+                      </span>
                     </div>
                     {selectedOrder.note && (
                       <div className="sm:col-span-2">

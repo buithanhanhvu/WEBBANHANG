@@ -158,7 +158,10 @@ public final class Requests {
         @Pattern(regexp = "^[0-9]{9,11}$", message = "Số điện thoại không hợp lệ (phải gồm 9-11 chữ số)")
         String shippingPhone,
 
-        String note
+        String note,
+
+        /** "COD" (default) hoặc "VNPAY" */
+        String paymentMethod
     ) {}
 
     public record OrderStatusRequest(

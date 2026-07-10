@@ -5,7 +5,7 @@ import { useCartStore } from '../store/useCartStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { CouponInput } from '../components/CouponInput';
 import api from '../services/api';
-import { CreditCard, Truck, MessageSquare, ArrowLeft, Loader2, CheckCircle2, Ticket } from 'lucide-react';
+import { CreditCard, Truck, MessageSquare, ArrowLeft, Loader2, CheckCircle2, Ticket, Banknote, ShieldCheck } from 'lucide-react';
 
 interface CheckoutFormInput {
   shippingName: string;
@@ -23,6 +23,9 @@ export const Checkout: React.FC = () => {
   const [couponCode, setCouponCode] = useState<string>('');
   const [discountAmount, setDiscountAmount] = useState<number>(0);
   const [appliedTotal, setAppliedTotal] = useState<number | null>(null);
+
+  // Payment method state
+  const [paymentMethod, setPaymentMethod] = useState<'COD' | 'VNPAY'>('COD');
 
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -61,14 +64,22 @@ export const Checkout: React.FC = () => {
         shippingName: data.shippingName,
         shippingAddress: data.shippingAddress,
         shippingPhone: data.shippingPhone,
-        note: data.note
+        note: data.note,
+        paymentMethod: paymentMethod
       };
 
       const res = await api.post('/api/orders', payload);
       const placedOrder = res.data.data;
       setOrderId(placedOrder.id);
-      
-      // Simulate payment processing / loading overlay
+
+      // Nếu chọn VNPAY → redirect sang cổng thanh toán
+      if (paymentMethod === 'VNPAY' && placedOrder.paymentUrl) {
+        clearCart();
+        window.location.href = placedOrder.paymentUrl;
+        return;
+      }
+
+      // COD → hiện màn hình thành công
       setTimeout(() => {
         clearCart();
         setIsSuccess(true);
@@ -209,18 +220,67 @@ export const Checkout: React.FC = () => {
                 />
               </div>
 
-              {/* Simulated Payment details info */}
+              {/* Payment Method Selection */}
               <div className="mt-8 pt-6 border-t border-slate-100">
                 <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
                   <CreditCard className="h-4.5 w-4.5 text-indigo-500" />
                   Phương thức thanh toán
                 </h3>
-                <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 flex justify-between items-center">
-                  <div>
-                    <p className="text-xs font-bold text-blue-800">Thanh toán khi nhận hàng (COD)</p>
-                    <p className="text-[10px] text-blue-500 font-semibold mt-0.5">Không tốn phí dịch vụ, thanh toán bằng tiền mặt khi nhận hàng.</p>
-                  </div>
-                  <input defaultChecked type="radio" className="h-4 w-4 accent-blue-600" />
+                <div className="space-y-2.5">
+                  {/* COD Option */}
+                  <label
+                    className={`flex items-center justify-between rounded-xl border p-4 cursor-pointer transition-all ${
+                      paymentMethod === 'COD'
+                        ? 'border-blue-400 bg-blue-50/60 ring-1 ring-blue-300'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">💵</span>
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">Thanh toán khi nhận hàng (COD)</p>
+                        <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Không tốn phí, thanh toán bằng tiền mặt khi nhận.</p>
+                      </div>
+                    </div>
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="COD"
+                      checked={paymentMethod === 'COD'}
+                      onChange={() => setPaymentMethod('COD')}
+                      className="h-4 w-4 accent-blue-600"
+                    />
+                  </label>
+
+                  {/* VNPAY Option */}
+                  <label
+                    className={`flex items-center justify-between rounded-xl border p-4 cursor-pointer transition-all ${
+                      paymentMethod === 'VNPAY'
+                        ? 'border-blue-400 bg-blue-50/60 ring-1 ring-blue-300'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <img
+                        src="https://sandbox.vnpayment.vn/paymentv2/Assets/Images/logoVNPAY-QR.svg"
+                        alt="VNPAY"
+                        className="h-7 w-auto object-contain"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">Thanh toán qua VNPAY</p>
+                        <p className="text-[10px] text-slate-400 font-semibold mt-0.5">ATM, Visa/Master, QR Code — bảo mật & nhanh chóng.</p>
+                      </div>
+                    </div>
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="VNPAY"
+                      checked={paymentMethod === 'VNPAY'}
+                      onChange={() => setPaymentMethod('VNPAY')}
+                      className="h-4 w-4 accent-blue-600"
+                    />
+                  </label>
                 </div>
               </div>
 
@@ -233,10 +293,12 @@ export const Checkout: React.FC = () => {
                 {loading ? (
                   <>
                     <Loader2 className="h-4.5 w-4.5 animate-spin" />
-                    Đang xử lý đặt hàng...
+                    {paymentMethod === 'VNPAY' ? 'Đang chuyển đến VNPAY...' : 'Đang xử lý đặt hàng...'}
                   </>
                 ) : (
-                  `Xác nhận đặt hàng (${formatPrice(finalTotal)})`
+                  paymentMethod === 'VNPAY'
+                    ? `Thanh toán qua VNPAY (${formatPrice(finalTotal)})`
+                    : `Xác nhận đặt hàng (${formatPrice(finalTotal)})`
                 )}
               </button>
             </form>

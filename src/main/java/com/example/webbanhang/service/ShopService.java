@@ -33,6 +33,7 @@ public class ShopService {
 
     private final WishlistRepository wishlistRepository;
     private final RecycleBinService recycleBinService;
+    private final VNPayService vnPayService;
     private RealtimeService realtimeService;
 
     @PersistenceContext
@@ -49,7 +50,8 @@ public class ShopService {
                        ReviewRepository reviewRepository,
 
                        WishlistRepository wishlistRepository,
-                       RecycleBinService recycleBinService) {
+                       RecycleBinService recycleBinService,
+                       VNPayService vnPayService) {
         this.userRepository = userRepository;
         this.categoryRepository = categoryRepository;
         this.productRepository = productRepository;
@@ -62,6 +64,7 @@ public class ShopService {
 
         this.wishlistRepository = wishlistRepository;
         this.recycleBinService = recycleBinService;
+        this.vnPayService = vnPayService;
     }
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -265,6 +268,8 @@ public class ShopService {
                 .shippingAddress(request.shippingAddress())
                 .shippingPhone(request.shippingPhone())
                 .note(request.note())
+                .paymentMethod(request.paymentMethod() != null && "VNPAY".equalsIgnoreCase(request.paymentMethod()) ? "VNPAY" : "COD")
+                .paymentStatus("PENDING")
                 .build();
         o = orderRepository.save(o);
 
@@ -302,7 +307,20 @@ public class ShopService {
             realtimeService.orderChanged("created", Map.of("id", o.getId()));
         }
 
-        return mapOrder(o);
+        Map<String, Object> result = mapOrder(o);
+
+        // Nếu thanh toán qua VNPAY, tạo URL redirect và trả về client
+        if ("VNPAY".equals(o.getPaymentMethod())) {
+            String paymentUrl = vnPayService.createPaymentUrl(
+                    o.getId(),
+                    o.getTotalAmount(),
+                    "Thanh toan don hang #" + o.getId(),
+                    null // IP sẽ được lấy từ controller nếu cần
+            );
+            result.put("paymentUrl", paymentUrl);
+        }
+
+        return result;
     }
 
     public List<Map<String, Object>> orders(long userId, boolean admin) {
@@ -955,6 +973,30 @@ public class ShopService {
         return result;
     }
 
+    @Transactional
+    public void updateVNPayPaymentStatus(long orderId, String txnRef, String transactionNo, boolean success) {
+        Order o = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+        o.setVnpayTxnRef(txnRef);
+        o.setVnpayTransactionNo(transactionNo);
+        if (success) {
+            o.setPaymentStatus("PAID");
+        } else {
+            o.setPaymentStatus("FAILED");
+            // Nếu thanh toán thất bại thì huỷ đơn và hoàn lại tồn kho
+            if (OrderStatus.PENDING.name().equals(o.getStatus())) {
+                o.setStatus(OrderStatus.CANCELLED.name());
+                for (OrderItem oi : o.getItems()) {
+                    Product p = oi.getProduct();
+                    p.setStock(p.getStock() + oi.getQuantity());
+                    productRepository.save(p);
+                }
+                if (realtimeService != null) realtimeService.stockChanged();
+            }
+        }
+        orderRepository.save(o);
+    }
+
     private Coupon couponByCode(String code) {
         requireText(code, "Coupon code is required");
         Coupon c = couponRepository.findByCodeAndActiveTrue(code.trim().toUpperCase())
@@ -1011,6 +1053,8 @@ public class ShopService {
         m.put("shipping_address", o.getShippingAddress());
         m.put("shipping_phone", o.getShippingPhone());
         m.put("note", o.getNote());
+        m.put("payment_method", o.getPaymentMethod());
+        m.put("payment_status", o.getPaymentStatus());
         m.put("created_at", o.getCreatedAt());
 
         List<Map<String, Object>> itemMaps = new ArrayList<>();

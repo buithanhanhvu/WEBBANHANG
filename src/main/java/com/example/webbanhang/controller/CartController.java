@@ -6,6 +6,7 @@ import com.example.webbanhang.dto.Requests.CheckoutRequest;
 import com.example.webbanhang.dto.Requests.ReviewRequest;
 import com.example.webbanhang.security.CurrentUserService;
 import com.example.webbanhang.service.ShopService;
+import com.example.webbanhang.service.VNPayService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,10 +22,12 @@ import java.util.Map;
 public class CartController {
     private final ShopService shopService;
     private final CurrentUserService currentUserService;
+    private final VNPayService vnPayService;
 
-    public CartController(ShopService shopService, CurrentUserService currentUserService) {
+    public CartController(ShopService shopService, CurrentUserService currentUserService, VNPayService vnPayService) {
         this.shopService = shopService;
         this.currentUserService = currentUserService;
+        this.vnPayService = vnPayService;
     }
 
     @GetMapping("/cart")
@@ -70,7 +73,18 @@ public class CartController {
     @PostMapping("/orders")
     @Operation(summary = "Tạo đơn hàng mới (Thanh toán)")
     public ApiResponse<Map<String, Object>> checkout(@Valid @RequestBody CheckoutRequest body, HttpServletRequest request) {
-        return ApiResponse.ok("Order created", shopService.checkout(currentUserService.requireUser(request).id(), body));
+        long userId = currentUserService.requireUser(request).id();
+        Map<String, Object> order = shopService.checkout(userId, body);
+
+        // Nếu chọn VNPAY, tạo thêm payment URL
+        if ("VNPAY".equalsIgnoreCase(body.paymentMethod())) {
+            java.math.BigDecimal total = (java.math.BigDecimal) order.get("total_amount");
+            long orderId = ((Number) order.get("id")).longValue();
+            String ip = getClientIp(request);
+            String payUrl = vnPayService.createPaymentUrl(orderId, total, "Thanh toan don hang #" + orderId, ip);
+            order.put("paymentUrl", payUrl);
+        }
+        return ApiResponse.ok("Order created", order);
     }
 
     @GetMapping("/orders")
@@ -136,5 +150,68 @@ public class CartController {
             HttpServletRequest request) {
         long userId = currentUserService.requireUser(request).id();
         return ApiResponse.ok(shopService.getUserSpendingStats(userId, period));
+    }
+
+    /**
+     * VNPAY IPN – VNPAY gọi server-to-server để xác nhận giao dịch.
+     * Endpoint này phải public (không cần auth).
+     */
+    @GetMapping("/vnpay/ipn")
+    @Operation(summary = "VNPAY IPN callback (server-to-server)")
+    public Map<String, String> vnpayIpn(@RequestParam Map<String, String> params) {
+        if (!vnPayService.verifySignature(params)) {
+            return Map.of("RspCode", "97", "Message", "Invalid signature");
+        }
+        try {
+            String txnRef = vnPayService.getTxnRef(params);
+            long orderId = vnPayService.parseOrderId(txnRef);
+            boolean success = vnPayService.isPaymentSuccess(params);
+            String transactionNo = params.getOrDefault("vnp_TransactionNo", "");
+            shopService.updateVNPayPaymentStatus(orderId, txnRef, transactionNo, success);
+            return Map.of("RspCode", "00", "Message", "Confirm success");
+        } catch (Exception e) {
+            return Map.of("RspCode", "99", "Message", "Internal error");
+        }
+    }
+
+    /**
+     * VNPAY Return URL – người dùng được redirect về sau khi thanh toán.
+     * Frontend nhận params rồi gọi endpoint này để lấy kết quả.
+     */
+    @GetMapping("/vnpay/return")
+    @Operation(summary = "Xác minh kết quả thanh toán VNPAY từ return URL")
+    public ApiResponse<Map<String, Object>> vnpayReturn(@RequestParam Map<String, String> params) {
+        if (!vnPayService.verifySignature(params)) {
+            Map<String, Object> errResult = new java.util.LinkedHashMap<>();
+            errResult.put("success", false);
+            errResult.put("error", "Chữ ký không hợp lệ");
+            return ApiResponse.ok(errResult);
+        }
+        String txnRef = vnPayService.getTxnRef(params);
+        long orderId = vnPayService.parseOrderId(txnRef);
+        boolean success = vnPayService.isPaymentSuccess(params);
+        String transactionNo = params.getOrDefault("vnp_TransactionNo", "");
+        shopService.updateVNPayPaymentStatus(orderId, txnRef, transactionNo, success);
+
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("success", success);
+        result.put("orderId", orderId);
+        result.put("txnRef", txnRef);
+        result.put("responseCode", params.get("vnp_ResponseCode"));
+        return ApiResponse.ok(result);
+    }
+
+    // ── Helper ───────────────────────────────────────────────────────────────
+
+    private String getClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isBlank() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        // X-Forwarded-For có thể chứa nhiều IP, lấy IP đầu tiên
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip;
     }
 }

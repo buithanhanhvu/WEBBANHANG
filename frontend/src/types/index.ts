@@ -89,6 +89,8 @@ export interface Order {
   shipping_address: string;
   shipping_phone: string;
   note?: string;
+  payment_method?: string;
+  payment_status?: string;
   created_at: string;
   items: OrderItem[];
 }

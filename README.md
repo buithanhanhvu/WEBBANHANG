@@ -125,7 +125,7 @@ Hệ thống bao gồm **16 bảng** được chia thành các nhóm chức năn
 | 7 | **`wishlists`** | Danh sách sản phẩm yêu thích được lưu bởi khách hàng để theo dõi tiện lợi. |
 | 8 | **`coupons`** | Thông tin các mã giảm giá (voucher) do hệ thống hoặc Admin phát hành (mã code, hạn dùng, số lượt sử dụng tối đa). |
 | 9 | **`user_coupons`** | Ví voucher cá nhân, lưu giữ các mã giảm giá khách hàng đã thu thập được để sử dụng lúc thanh toán. |
-| 10 | **`orders`** | Đơn hàng tổng quát: thông tin người nhận, địa chỉ giao hàng, tổng tiền, tiền giảm giá và trạng thái đơn hàng (`PENDING`, `DELIVERED`, `CANCELLED`...). |
+| 10 | **`orders`** | Đơn hàng tổng quát: thông tin người nhận, địa chỉ giao hàng, tổng tiền, tiền giảm giá, trạng thái đơn hàng (`PENDING`, `DELIVERED`, `CANCELLED`...), phương thức thanh toán (`COD`/`VNPAY`), trạng thái thanh toán (`PENDING`/`PAID`/`FAILED`) và thông tin đối chiếu VNPAY (`vnpay_txn_ref`, `vnpay_transaction_no`). |
 | 11 | **`order_items`** | Chi tiết từng sản phẩm trong đơn hàng (giá bán và số lượng tại thời điểm mua), đảm bảo tính toàn vẹn của hóa đơn khi giá sản phẩm thay đổi sau này. |
 | 12 | **`reviews`** | Đánh giá và bình luận về sản phẩm (đánh giá sao từ 1 đến 5), ràng buộc logic chỉ cho phép khách hàng đánh giá sau khi đã mua sản phẩm đó. |
 | 13 | **`recycle_bin`** | Thùng rác hệ thống lưu trữ các dữ liệu đã xóa mềm (Soft Delete) dưới dạng chuỗi JSON, cho phép Admin khôi phục nhanh (User, Product, Category, Coupon). |

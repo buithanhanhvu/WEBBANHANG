@@ -5,7 +5,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import api from '../services/api';
 import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 
-const GOOGLE_CLIENT_ID = '1071806914161-c05nk1ag6062biten5vg5ara4ns7l63j.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = '1071806914161-7tjfbvs26pk1n47t89lr14q201djorre.apps.googleusercontent.com';
 
 declare global {
   interface Window {

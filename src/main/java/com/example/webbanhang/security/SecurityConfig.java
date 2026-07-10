@@ -37,7 +37,9 @@ public class SecurityConfig {
                     "/api/auth/reset-password",
                     "/api/auth/refresh",
                     "/api/categories/**",
-                    "/api/products/**"
+                    "/api/products/**",
+                    "/api/payment/vnpay-return",
+                    "/api/payment/vnpay-ipn"
                 ).permitAll()
                 // Admin API – require ADMIN role
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
