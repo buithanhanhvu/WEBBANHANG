@@ -84,9 +84,10 @@ erDiagram
     coupons ||--o{ orders : "áp dụng"
     
     orders ||--o{ order_items : "chứa"
+    orders ||--|| payments : "thanh toán"
 ```
 
-#### Mô tả chi tiết chức năng của 16 bảng dữ liệu:
+#### Mô tả chi tiết chức năng của 17 bảng dữ liệu:
 1.  **`users`**: Thông tin tài khoản (username, email, mật khẩu băm, vai trò `CUSTOMER`/`ADMIN`, trạng thái `ACTIVE`/`BANNED`).
 2.  **`categories`**: Danh mục sản phẩm (Điện thoại, Laptop, Phụ kiện...).
 3.  **`products`**: Chi tiết sản phẩm (tên, giá bán, số lượng tồn kho `stock`, phần trăm giảm giá, thương hiệu, danh mục).
@@ -96,13 +97,14 @@ erDiagram
 7.  **`wishlists`**: Danh sách sản phẩm yêu thích của từng khách hàng.
 8.  **`coupons`**: Thông tin mã giảm giá (code, phần trăm giảm, hạn sử dụng, số lượt dùng tối đa `max_uses`).
 9.  **`user_coupons`**: Ví voucher cá nhân, lưu giữ các mã khách hàng đã thu thập được.
-10. **`orders`**: Thông tin đơn hàng (người nhận, địa chỉ, số điện thoại, ghi chú, tổng tiền, trạng thái đơn hàng, phương thức thanh toán `COD`/`VNPAY`, trạng thái thanh toán `PENDING`/`PAID`/`FAILED` và thông tin đối chiếu VNPAY).
-11. **`order_items`**: Chi tiết sản phẩm và giá mua tại thời điểm đặt hàng (ngăn lỗi hóa đơn khi giá sản phẩm thay đổi sau này).
-12. **`reviews`**: Đánh giá (1-5 sao) và bình luận từ khách hàng đã mua sản phẩm thành công.
-13. **`recycle_bin`**: Thùng rác hệ thống, lưu dữ liệu xóa mềm (Soft Delete) dưới dạng JSON để khôi phục nhanh.
-14. **`refresh_tokens`**: Quản lý làm mới JWT Access Token tự động.
-15. **`password_resets`**: Lưu mã xác thực OTP dùng một lần và thời hạn hiệu lực (1 phút) để lấy lại mật khẩu.
-16. **`flyway_schema_history`**: Quản lý các phiên bản di chuyển/nâng cấp cấu trúc dữ liệu tự động (Flyway migrations).
+10. **`orders`**: Thông tin đơn hàng (người nhận, địa chỉ, số điện thoại, ghi chú, tổng tiền, trạng thái đơn hàng).
+11. **`payments`**: **Mới**: Chi tiết thanh toán của đơn hàng: phương thức thanh toán (`COD`/`VNPAY`), trạng thái thanh toán (`PENDING`/`PAID`/`FAILED`), số tiền và thông tin đối chiếu VNPAY (`vnpay_txn_ref`, `vnpay_transaction_no`).
+12. **`order_items`**: Chi tiết sản phẩm và giá mua tại thời điểm đặt hàng (ngăn lỗi hóa đơn khi giá sản phẩm thay đổi sau này).
+13. **`reviews`**: Đánh giá (1-5 sao) và bình luận từ khách hàng đã mua sản phẩm thành công.
+14. **`recycle_bin`**: Thùng rác hệ thống, lưu dữ liệu xóa mềm (Soft Delete) dưới dạng JSON để khôi phục nhanh.
+15. **`refresh_tokens`**: Quản lý làm mới JWT Access Token tự động.
+16. **`password_resets`**: Lưu mã xác thực OTP dùng một lần và thời hạn hiệu lực (1 phút) để lấy lại mật khẩu.
+17. **`flyway_schema_history`**: Quản lý các phiên bản di chuyển/nâng cấp cấu trúc dữ liệu tự động (Flyway migrations).
 
 ---
 

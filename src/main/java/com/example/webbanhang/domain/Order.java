@@ -47,19 +47,8 @@ public class Order {
     @Column(length = 500)
     private String note;
 
-    @Column(name = "payment_method", nullable = false, length = 20)
-    @Builder.Default
-    private String paymentMethod = "COD";
-
-    @Column(name = "payment_status", nullable = false, length = 20)
-    @Builder.Default
-    private String paymentStatus = "PENDING";
-
-    @Column(name = "vnpay_txn_ref", length = 100)
-    private String vnpayTxnRef;
-
-    @Column(name = "vnpay_transaction_no", length = 100)
-    private String vnpayTransactionNo;
+    @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private Payment payment;
 
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;

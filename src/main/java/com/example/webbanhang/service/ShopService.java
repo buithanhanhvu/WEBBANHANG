@@ -268,9 +268,16 @@ public class ShopService {
                 .shippingAddress(request.shippingAddress())
                 .shippingPhone(request.shippingPhone())
                 .note(request.note())
+                .build();
+
+        Payment payment = Payment.builder()
+                .order(o)
                 .paymentMethod(request.paymentMethod() != null && "VNPAY".equalsIgnoreCase(request.paymentMethod()) ? "VNPAY" : "COD")
                 .paymentStatus("PENDING")
+                .amount(total)
                 .build();
+        o.setPayment(payment);
+
         o = orderRepository.save(o);
 
         if (coupon != null) {
@@ -310,7 +317,7 @@ public class ShopService {
         Map<String, Object> result = mapOrder(o);
 
         // Nếu thanh toán qua VNPAY, tạo URL redirect và trả về client
-        if ("VNPAY".equals(o.getPaymentMethod())) {
+        if (o.getPayment() != null && "VNPAY".equals(o.getPayment().getPaymentMethod())) {
             String paymentUrl = vnPayService.createPaymentUrl(
                     o.getId(),
                     o.getTotalAmount(),
@@ -977,19 +984,24 @@ public class ShopService {
     public void updateVNPayPaymentStatus(long orderId, String txnRef, String transactionNo, boolean success) {
         Order o = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
-        o.setVnpayTxnRef(txnRef);
-        o.setVnpayTransactionNo(transactionNo);
+        Payment p = o.getPayment();
+        if (p == null) {
+            p = Payment.builder().order(o).amount(o.getTotalAmount()).build();
+            o.setPayment(p);
+        }
+        p.setVnpayTxnRef(txnRef);
+        p.setVnpayTransactionNo(transactionNo);
         if (success) {
-            o.setPaymentStatus("PAID");
+            p.setPaymentStatus("PAID");
         } else {
-            o.setPaymentStatus("FAILED");
+            p.setPaymentStatus("FAILED");
             // Nếu thanh toán thất bại thì huỷ đơn và hoàn lại tồn kho
             if (OrderStatus.PENDING.name().equals(o.getStatus())) {
                 o.setStatus(OrderStatus.CANCELLED.name());
                 for (OrderItem oi : o.getItems()) {
-                    Product p = oi.getProduct();
-                    p.setStock(p.getStock() + oi.getQuantity());
-                    productRepository.save(p);
+                    Product prod = oi.getProduct();
+                    prod.setStock(prod.getStock() + oi.getQuantity());
+                    productRepository.save(prod);
                 }
                 if (realtimeService != null) realtimeService.stockChanged();
             }
@@ -1053,8 +1065,8 @@ public class ShopService {
         m.put("shipping_address", o.getShippingAddress());
         m.put("shipping_phone", o.getShippingPhone());
         m.put("note", o.getNote());
-        m.put("payment_method", o.getPaymentMethod());
-        m.put("payment_status", o.getPaymentStatus());
+        m.put("payment_method", o.getPayment() != null ? o.getPayment().getPaymentMethod() : "COD");
+        m.put("payment_status", o.getPayment() != null ? o.getPayment().getPaymentStatus() : "PENDING");
         m.put("created_at", o.getCreatedAt());
 
         List<Map<String, Object>> itemMaps = new ArrayList<>();

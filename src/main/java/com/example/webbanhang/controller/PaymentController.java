@@ -2,6 +2,7 @@ package com.example.webbanhang.controller;
 
 import com.example.webbanhang.common.ApiResponse;
 import com.example.webbanhang.domain.Order;
+import com.example.webbanhang.domain.Payment;
 import com.example.webbanhang.exception.ResourceNotFoundException;
 import com.example.webbanhang.repository.OrderRepository;
 import com.example.webbanhang.service.VNPayService;
@@ -86,11 +87,18 @@ public class PaymentController {
 
         if (valid && success && orderId > 0) {
             Order order = orderRepository.findById(orderId).orElse(null);
-            if (order != null && "PENDING".equals(order.getPaymentStatus())) {
-                order.setPaymentStatus("PAID");
-                order.setVnpayTxnRef(txnRef);
-                order.setVnpayTransactionNo(transactionNo);
-                orderRepository.save(order);
+            if (order != null) {
+                Payment payment = order.getPayment();
+                if (payment == null) {
+                    payment = Payment.builder().order(order).amount(order.getTotalAmount()).build();
+                    order.setPayment(payment);
+                }
+                if ("PENDING".equals(payment.getPaymentStatus())) {
+                    payment.setPaymentStatus("PAID");
+                    payment.setVnpayTxnRef(txnRef);
+                    payment.setVnpayTransactionNo(transactionNo);
+                    orderRepository.save(order);
+                }
             }
             response.sendRedirect("/payment/result?status=success&orderId=" + orderId);
         } else {
@@ -99,9 +107,16 @@ public class PaymentController {
             if (orderId > 0 && valid) {
                 // Chữ ký OK nhưng thanh toán thất bại – cập nhật trạng thái
                 Order order = orderRepository.findById(orderId).orElse(null);
-                if (order != null && "PENDING".equals(order.getPaymentStatus())) {
-                    order.setPaymentStatus("FAILED");
-                    orderRepository.save(order);
+                if (order != null) {
+                    Payment payment = order.getPayment();
+                    if (payment == null) {
+                        payment = Payment.builder().order(order).amount(order.getTotalAmount()).build();
+                        order.setPayment(payment);
+                    }
+                    if ("PENDING".equals(payment.getPaymentStatus())) {
+                        payment.setPaymentStatus("FAILED");
+                        orderRepository.save(order);
+                    }
                 }
             }
             response.sendRedirect(failRedirect);
@@ -140,17 +155,23 @@ public class PaymentController {
             return result;
         }
 
+        Payment payment = order.getPayment();
+        if (payment == null) {
+            payment = Payment.builder().order(order).amount(order.getTotalAmount()).build();
+            order.setPayment(payment);
+        }
+
         // Tránh cập nhật trùng lặp
-        if (!"PENDING".equals(order.getPaymentStatus())) {
+        if (!"PENDING".equals(payment.getPaymentStatus())) {
             result.put("RspCode", "02");
             result.put("Message", "Order already confirmed");
             return result;
         }
 
         boolean success = vnPayService.isPaymentSuccess(params);
-        order.setPaymentStatus(success ? "PAID" : "FAILED");
-        order.setVnpayTxnRef(txnRef);
-        order.setVnpayTransactionNo(params.getOrDefault("vnp_TransactionNo", ""));
+        payment.setPaymentStatus(success ? "PAID" : "FAILED");
+        payment.setVnpayTxnRef(txnRef);
+        payment.setVnpayTransactionNo(params.getOrDefault("vnp_TransactionNo", ""));
         orderRepository.save(order);
 
         result.put("RspCode", "00");
