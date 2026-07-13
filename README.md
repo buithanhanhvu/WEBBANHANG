@@ -14,7 +14,6 @@ Hệ thống được tích hợp các cơ chế bảo mật cao cấp (JWT, Goo
 Để phục vụ yêu cầu kiểm thử và nộp báo cáo cho môn học, dự án đã chuẩn bị sẵn đầy đủ các tài liệu minh chứng:
 *   **Tài liệu Backend:** Xem chi tiết tại **[bao_cao_backend.md](bao_cao_backend.md)**. Tài liệu gồm mô tả nhóm API, lược đồ CSDL 3NF (ERD) và hướng dẫn chạy.
 *   **Tài liệu Frontend:** Xem chi tiết tại **[bao_cao_frontend.md](bao_cao_frontend.md)**. Tài liệu gồm thiết kế kiến trúc React + TS, quản lý trạng thái Zustand, thiết kế các component yêu cầu và tích hợp API.
-*   **Kịch bản Thuyết trình bảo vệ:** Xem chi tiết tại **[KICH_BAN_THUYET_TRINH.md](KICH_BAN_THUYET_TRINH.md)** chuẩn bị sẵn các lời dẫn thuyết trình trước giáo viên.
 *   **Bộ Test API 13 Trường Hợp Toàn Diện (Vượt mức 8 yêu cầu tối thiểu):** 
     *   **Test tự động hóa (JUnit & MockMvc):** Mã nguồn nằm tại [ApiControllerTests.java](src/test/java/com/example/webbanhang/controller/ApiControllerTests.java).
     *   **Test thủ công bằng REST Client:** File [api-test-cases.http](api-test-cases.http) ở thư mục gốc chứa sẵn 13 kịch bản kiểm thử (8 thành công, 5 thất bại).
@@ -319,5 +318,33 @@ Khách hàng điền thông tin người nhận (Họ tên, SĐT, Địa chỉ, 
 ##### Hình 13 - Customer - Theo dõi trạng thái đơn hàng (Order History & Tracking):
 Giao diện lịch sử đơn hàng của người dùng, hiển thị đơn hàng vừa đặt đang ở trạng thái `PENDING` (Chờ xác nhận) và cho phép khách hàng tự hủy đơn hàng nếu muốn.
 ![Customer - Theo dõi đơn hàng](./images/report_customer_order_tracking.png?raw=true)
+
+---
+
+#### 💳 PHẦN 3: QUY TRÌNH THANH TOÁN TRỰC TUYẾN QUA CỔNG VNPAY (VNPAY PAYMENT FLOW)
+
+##### Hình 14 - Giao diện chọn phương thức thanh toán VNPAY:
+Khách hàng tiến hành đặt hàng tại trang thanh toán và lựa chọn phương thức thanh toán trực tuyến qua cổng **VNPAY**.
+![Chọn phương thức thanh toán VNPAY](./images/thanhtoan/06_checkout_payment.png?raw=true)
+
+##### Hình 15 - Điều hướng sang Cổng thanh toán VNPAY:
+Hệ thống tạo URL thanh toán an toàn và điều hướng người dùng sang môi trường thử nghiệm (Sandbox) của VNPAY.
+![Điều hướng VNPAY](./images/thanhtoan/07_vnpay_dieu_huong.png?raw=true)
+
+##### Hình 16 - Giao diện nhập thông tin thẻ test VNPAY:
+Người dùng nhập thông tin thẻ test do VNPAY cung cấp (Ngân hàng NCB) để thực hiện giao dịch thử nghiệm.
+![Nhập thông tin thẻ VNPAY](./images/thanhtoan/08_vnpay_nhap_thong_tin.png?raw=true)
+
+##### Hình 17 - Nhập mã OTP xác thực giao dịch:
+Người dùng nhập mã OTP mặc định (`123456`) để hoàn tất bước xác thực thanh toán phía ngân hàng.
+![Nhập mã OTP VNPAY](./images/thanhtoan/09_vnpay_nhap_otp.png?raw=true)
+
+##### Hình 18 - Thông báo Đặt hàng & Thanh toán thành công:
+Sau khi thanh toán thành công, VNPAY chuyển hướng phản hồi về hệ thống AstraShop, hiển thị màn hình thông báo hoàn thành đơn hàng.
+![Đặt hàng thành công](./images/thanhtoan/10_dat_hang_thanh_cong.png?raw=true)
+
+##### Hình 19 - Kiểm tra lịch sử giao dịch và trạng thái thanh toán:
+Khách hàng có thể truy cập lịch sử đơn hàng để kiểm tra đơn hàng đã được cập nhật trạng thái thanh toán thành công (`Đã thanh toán`).
+![Lịch sử giao dịch](./images/thanhtoan/11_lich_su_giao_dich.png?raw=true)
 
 
