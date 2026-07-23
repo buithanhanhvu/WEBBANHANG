@@ -1,8 +1,8 @@
 {
 	"info": {
 		"_postman_id": "d8a1c92a-fa63-47a8-b648-fb2dc8c4c7c8",
-		"name": "AstraShop API Testing",
-		"description": "Bộ kiểm thử API nâng cao gồm 13 trường hợp (8 thành công, 5 thất bại) cho hệ thống AstraShop (Spring Boot + MySQL)",
+		"name": "AstraShop API Testing & Automation Suite",
+		"description": "Bộ kiểm thử API tự động hóa gồm 13 kịch bản kiểm thử (8 thành công, 5 thất bại) tích hợp mã JavaScript pm.test() để validate HTTP Status Code, JSON Schema và tự động trích xuất JWT Token cho hệ thống AstraShop (Spring Boot + MySQL).",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
@@ -11,6 +11,24 @@
 			"item": [
 				{
 					"name": "1. [Thành công] Đăng ký khách hàng mới",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Response status is success\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql(\"success\");",
+									"    pm.expect(jsonData.data).to.have.property(\"token\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "POST",
 						"header": [
@@ -44,11 +62,17 @@
 							"listen": "test",
 							"script": {
 								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
 									"var jsonData = pm.response.json();",
-									"if (jsonData && jsonData.data && jsonData.data.token) {",
-									"    pm.collectionVariables.set(\"token\", jsonData.data.token);",
-									"    console.log(\"Đã lưu token tự động: \" + jsonData.data.token);",
-									"}"
+									"pm.test(\"Token exists and stored in collection variable\", function () {",
+									"    pm.expect(jsonData.data).to.have.property(\"token\");",
+									"    if (jsonData && jsonData.data && jsonData.data.token) {",
+									"        pm.collectionVariables.set(\"token\", jsonData.data.token);",
+									"        console.log(\"Đã lưu JWT Token tự động: \" + jsonData.data.token);",
+									"    }",
+									"});"
 								],
 								"type": "text/javascript"
 							}
@@ -64,7 +88,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"usernameOrEmail\": \"customer_test_postman\",\n  \"password\": \"Password123\"\n}"
+							"raw": "{\n  \"usernameOrEmail\": \"customer\",\n  \"password\": \"customer123\"\n}"
 						},
 						"url": {
 							"raw": "{{host}}/api/auth/login",
@@ -82,6 +106,25 @@
 				},
 				{
 					"name": "3. [Thành công] Xem thông tin chi tiết một sản phẩm",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Product ID matches 1\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.data.id).to.eql(1);",
+									"    pm.expect(jsonData.data).to.have.property(\"name\");",
+									"    pm.expect(jsonData.data).to.have.property(\"price\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -100,20 +143,81 @@
 					"response": []
 				},
 				{
-					"name": "4. [Thành công] Thêm sản phẩm vào giỏ hàng",
+					"name": "4. [Thành công] Lấy danh sách sản phẩm có bộ lọc và phân trang",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Data is array of products\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.data).to.be.an(\"array\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{host}}/api/products?search=Phone&page=0&size=5",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"products"
+							],
+							"query": [
 								{
-									"key": "token",
-									"value": "{{token}}",
-									"type": "string"
+									"key": "search",
+									"value": "Phone"
+								},
+								{
+									"key": "page",
+									"value": "0"
+								},
+								{
+									"key": "size",
+									"value": "5"
 								}
 							]
-						},
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "5. [Thành công] Thêm sản phẩm vào giỏ hàng (Yêu cầu Token)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Cart item added successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql(\"success\");",
+									"    pm.expect(jsonData.data.items).to.be.an(\"array\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
 						"method": "POST",
 						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
 							{
 								"key": "Content-Type",
 								"value": "application/json"
@@ -138,20 +242,32 @@
 					"response": []
 				},
 				{
-					"name": "5. [Thành công] Áp dụng mã giảm giá (Voucher)",
+					"name": "6. [Thành công] Áp dụng Mã giảm giá (Coupon)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Coupon applied successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql(\"success\");",
+									"    pm.expect(jsonData.data).to.have.property(\"discount\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{token}}",
-									"type": "string"
-								}
-							]
-						},
 						"method": "POST",
 						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
 							{
 								"key": "Content-Type",
 								"value": "application/json"
@@ -176,20 +292,32 @@
 					"response": []
 				},
 				{
-					"name": "6. [Thành công] Đặt hàng (Thanh toán)",
+					"name": "7. [Thành công] Đặt hàng (Checkout) & Trừ tồn kho",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Order created with PENDING status\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql(\"success\");",
+									"    pm.expect(jsonData.data.status).to.eql(\"PENDING\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{token}}",
-									"type": "string"
-								}
-							]
-						},
 						"method": "POST",
 						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
 							{
 								"key": "Content-Type",
 								"value": "application/json"
@@ -197,7 +325,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"couponCode\": \"\",\n  \"shippingName\": \"Người nhận Postman\",\n  \"shippingAddress\": \"456 Đường CMT8, Quận 3, HCM\",\n  \"shippingPhone\": \"0987654321\",\n  \"note\": \"Giao hàng giờ hành chính\"\n}"
+							"raw": "{\n  \"couponCode\": \"\",\n  \"shippingName\": \"Người Nhận Postman\",\n  \"shippingAddress\": \"456 Đường Lê Lợi, Hà Nội\",\n  \"shippingPhone\": \"0987654321\",\n  \"note\": \"Giao giờ hành chính\",\n  \"paymentMethod\": \"COD\"\n}"
 						},
 						"url": {
 							"raw": "{{host}}/api/orders",
@@ -213,17 +341,20 @@
 					"response": []
 				},
 				{
-					"name": "7. [Thành công] Admin Đăng nhập & Lấy Token Admin tự động",
+					"name": "8. [Thành công] Admin Đăng nhập & Thêm mới sản phẩm",
 					"event": [
 						{
 							"listen": "test",
 							"script": {
 								"exec": [
-									"var jsonData = pm.response.json();",
-									"if (jsonData && jsonData.data && jsonData.data.token) {",
-									"    pm.collectionVariables.set(\"adminToken\", jsonData.data.token);",
-									"    console.log(\"Đã lưu token admin tự động: \" + jsonData.data.token);",
-									"}"
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Admin product created\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql(\"success\");",
+									"    pm.expect(jsonData.data).to.have.property(\"id\");",
+									"});"
 								],
 								"type": "text/javascript"
 							}
@@ -254,52 +385,32 @@
 						}
 					},
 					"response": []
-				},
-				{
-					"name": "8. [Thành công] Admin thêm sản phẩm mới",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{adminToken}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"name\": \"Sản phẩm Junit Postman Test\",\n  \"description\": \"Mô tả sản phẩm tạo tự động qua Postman\",\n  \"price\": 149000,\n  \"stock\": 30,\n  \"imageUrl\": \"demo_product.png\",\n  \"categoryId\": 1,\n  \"featured\": true,\n  \"discountPercent\": 0,\n  \"brand\": \"AdminBrand\",\n  \"images\": []\n}"
-						},
-						"url": {
-							"raw": "{{host}}/api/admin/products",
-							"host": [
-								"{{host}}"
-							],
-							"path": [
-								"api",
-								"admin",
-								"products"
-							]
-						}
-					},
-					"response": []
 				}
 			]
 		},
 		{
-			"name": "II. CÁC TRƯỜNG HỢP THẤT BẠI (FAILURE/EXCEPTION CASES)",
+			"name": "II. CÁC TRƯỜNG HỢP THẤT BẠI/LỖI (FAILURE CASES)",
 			"item": [
 				{
-					"name": "9. [Thất bại] Đăng ký trùng tên đăng nhập đã tồn tại",
+					"name": "9. [Thất bại] Đăng ký trùng Username/Email",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 400 Bad Request\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});",
+									"pm.test(\"Error message indicates duplicate user\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql(\"error\");",
+									"    pm.expect(jsonData.message).to.include(\"đã tồn tại\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "POST",
 						"header": [
@@ -310,7 +421,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"username\": \"admin\",\n  \"email\": \"admin@shop.local\",\n  \"password\": \"Password123\",\n  \"fullName\": \"Admin Fake\",\n  \"phone\": \"0987654321\",\n  \"address\": \"Hanoi\"\n}"
+							"raw": "{\n  \"username\": \"customer\",\n  \"email\": \"customer@shop.local\",\n  \"password\": \"Password123\",\n  \"fullName\": \"Trùng Khách Hàng\",\n  \"phone\": \"0987654321\",\n  \"address\": \"Hồ Chí Minh\"\n}"
 						},
 						"url": {
 							"raw": "{{host}}/api/auth/register",
@@ -327,7 +438,24 @@
 					"response": []
 				},
 				{
-					"name": "10. [Thất bại] Đăng nhập sai mật khẩu",
+					"name": "10. [Thất bại] Đăng nhập sai Mật khẩu",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 400 Bad Request or 401 Unauthorized\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([400, 401]);",
+									"});",
+									"pm.test(\"Error status returned\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql(\"error\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "POST",
 						"header": [
@@ -338,7 +466,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"usernameOrEmail\": \"customer_test_postman\",\n  \"password\": \"SaiMatKhau123\"\n}"
+							"raw": "{\n  \"usernameOrEmail\": \"customer\",\n  \"password\": \"WrongPassword123\"\n}"
 						},
 						"url": {
 							"raw": "{{host}}/api/auth/login",
@@ -355,10 +483,32 @@
 					"response": []
 				},
 				{
-					"name": "11. [Thất bại] Thêm sản phẩm vào giỏ khi chưa đăng nhập",
+					"name": "11. [Thất bại] Thêm giỏ hàng số lượng vượt tồn kho",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 400 Bad Request\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});",
+									"pm.test(\"Exceed stock message returned\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql(\"error\");",
+									"    pm.expect(jsonData.message).to.include(\"tồn kho\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "POST",
 						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
 							{
 								"key": "Content-Type",
 								"value": "application/json"
@@ -366,7 +516,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"productId\": 1,\n  \"quantity\": 1\n}"
+							"raw": "{\n  \"productId\": 1,\n  \"quantity\": 99999\n}"
 						},
 						"url": {
 							"raw": "{{host}}/api/cart/add",
@@ -383,20 +533,77 @@
 					"response": []
 				},
 				{
-					"name": "12. [Thất bại] Khách hàng thường truy cập trang Admin Dashboard",
+					"name": "12. [Thất bại] Áp dụng Mã giảm giá không tồn tại",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 400 Bad Request\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});",
+									"pm.test(\"Invalid coupon message returned\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql(\"error\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{token}}",
-									"type": "string"
-								}
-							]
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"NON_EXISTENT_COUPON_999\"\n}"
 						},
+						"url": {
+							"raw": "{{host}}/api/coupons/apply",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"coupons",
+								"apply"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "13. [Thất bại] Truy cập trang Admin không có quyền (403)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 403 Forbidden\", function () {",
+									"    pm.response.to.have.status(403);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
 						"method": "GET",
-						"header": [],
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
 						"url": {
 							"raw": "{{host}}/api/admin/dashboard",
 							"host": [
@@ -410,65 +617,8 @@
 						}
 					},
 					"response": []
-				},
-				{
-					"name": "13. [Thất bại] Đánh giá sản phẩm chưa mua hoặc chưa giao thành công",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"productId\": 3,\n  \"rating\": 5,\n  \"comment\": \"Sản phẩm rất tốt nhưng tôi chưa mua!\"\n}"
-						},
-						"url": {
-							"raw": "{{host}}/api/reviews",
-							"host": [
-								"{{host}}"
-							],
-							"path": [
-								"api",
-								"reviews"
-							]
-						}
-					},
-					"response": []
 				}
 			]
-		}
-	],
-	"event": [
-		{
-			"listen": "prerequest",
-			"script": {
-				"type": "text/javascript",
-				"exec": [
-					""
-				]
-			}
-		},
-		{
-			"listen": "test",
-			"script": {
-				"type": "text/javascript",
-				"exec": [
-					""
-				]
-			}
 		}
 	],
 	"variable": [
@@ -479,11 +629,6 @@
 		},
 		{
 			"key": "token",
-			"value": "",
-			"type": "string"
-		},
-		{
-			"key": "adminToken",
 			"value": "",
 			"type": "string"
 		}

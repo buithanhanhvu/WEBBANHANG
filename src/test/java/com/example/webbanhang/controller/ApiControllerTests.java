@@ -152,7 +152,8 @@ public class ApiControllerTests {
                 "Receiver Name",
                 "Receiver Address",
                 "0987654321",
-                "Test Note"
+                "Test Note",
+                "COD"
         );
 
         mockMvc.perform(post("/api/orders")
