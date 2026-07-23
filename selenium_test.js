@@ -10,7 +10,7 @@ async function runAutomationTests() {
     }
 
     const browser = await chromium.launch({ headless: true });
-    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const page = await context.newPage();
 
     try {
@@ -19,32 +19,32 @@ async function runAutomationTests() {
         // ------------------------------------------------------------------
         console.log('📌 Running TC_UI_001: Customer Login...');
         await page.goto('http://localhost:3000/login', { waitUntil: 'networkidle' });
-        await page.fill('input[name="usernameOrEmail"], input[type="text"]', 'customer');
-        await page.fill('input[name="password"], input[type="password"]', 'customer123');
+        await page.fill('input[type="text"], input[name="usernameOrEmail"]', 'customer');
+        await page.fill('input[type="password"]', 'customer123');
         await page.click('button[type="submit"]');
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(2500);
         await page.screenshot({ path: path.join(outputDir, 'selenium_01_customer_login.png') });
         console.log('✅ TC_UI_001 Passed: Customer Login successful.');
 
         // ------------------------------------------------------------------
-        // TEST CASE 2: Xem chi tiết sản phẩm & Thêm vào giỏ hàng
+        // TEST CASE 2: Xem chi tiết sản phẩm & Album ảnh (Route: /product/1)
         // ------------------------------------------------------------------
-        console.log('📌 Running TC_UI_002: Product Detail & Add to Cart...');
-        await page.goto('http://localhost:3000/products/1', { waitUntil: 'networkidle' });
-        await page.waitForTimeout(1000);
+        console.log('📌 Running TC_UI_002: Product Detail Page...');
+        await page.goto('http://localhost:3000/product/1', { waitUntil: 'networkidle' });
+        await page.waitForTimeout(2500);
         await page.screenshot({ path: path.join(outputDir, 'selenium_02_product_detail.png') });
         console.log('✅ TC_UI_002 Passed: Product Detail loaded.');
 
         // ------------------------------------------------------------------
-        // TEST CASE 3: Giỏ hàng & Áp Voucher
+        // TEST CASE 3: Giỏ hàng & Trang Thanh toán
         // ------------------------------------------------------------------
         console.log('📌 Running TC_UI_003: Shopping Cart & Checkout...');
         await page.goto('http://localhost:3000/cart', { waitUntil: 'networkidle' });
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(2000);
         await page.screenshot({ path: path.join(outputDir, 'selenium_03_shopping_cart.png') });
 
         await page.goto('http://localhost:3000/checkout', { waitUntil: 'networkidle' });
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(2000);
         await page.screenshot({ path: path.join(outputDir, 'selenium_04_checkout_page.png') });
         console.log('✅ TC_UI_003 Passed: Checkout Page verified.');
 
@@ -53,13 +53,13 @@ async function runAutomationTests() {
         // ------------------------------------------------------------------
         console.log('📌 Running TC_UI_004: Admin Dashboard...');
         await page.goto('http://localhost:3000/login', { waitUntil: 'networkidle' });
-        await page.fill('input[name="usernameOrEmail"], input[type="text"]', 'admin');
-        await page.fill('input[name="password"], input[type="password"]', 'admin123');
+        await page.fill('input[type="text"], input[name="usernameOrEmail"]', 'admin');
+        await page.fill('input[type="password"]', 'admin123');
         await page.click('button[type="submit"]');
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(2500);
 
         await page.goto('http://localhost:3000/admin', { waitUntil: 'networkidle' });
-        await page.waitForTimeout(1500);
+        await page.waitForTimeout(2500);
         await page.screenshot({ path: path.join(outputDir, 'selenium_05_admin_dashboard.png') });
         console.log('✅ TC_UI_004 Passed: Admin Dashboard verified.');
 
